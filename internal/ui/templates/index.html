@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABAP Code Review</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
+</head>
+<body>
+  <h1>ABAP Code Review</h1>
+  <form hx-post="/api/reviews"
+        hx-target="#result"
+        hx-swap="innerHTML">
+    <label for="tr">Transport Request ID</label>
+    <input id="tr" name="transport_request_id" placeholder="NPLK900014" required>
+    <button type="submit">Request Review</button>
+  </form>
+  <div id="result"></div>
+</body>
+</html>

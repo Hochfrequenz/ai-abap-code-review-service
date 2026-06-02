@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Review {{.TRID}}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
+  <style media="print">
+    nav, button { display: none; }
+    body { font-family: serif; max-width: 100%; }
+  </style>
+</head>
+<body>
+  <nav><a href="/">← New review</a></nav>
+  <div id="status">
+    {{template "_status.html" .}}
+  </div>
+</body>
+</html>
