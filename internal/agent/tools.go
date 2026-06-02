@@ -17,10 +17,15 @@ type ADTClient interface {
 // TRObject is the agent-facing view of a transport request object.
 // URI is pre-computed so Claude doesn't need to know ADT path conventions.
 type TRObject struct {
+	// PgmID is the SAP Program ID — a CTS classification that groups object types
+	// (e.g. "R3TR" for repository objects, "LIMU" for sub-objects like includes).
+	// Sourced directly from adtler's TransportObject.PgmID.
 	PgmID string `json:"pgmid"`
+	// Type is the SAP object type code — e.g. "PROG" (program), "CLAS" (class),
+	// "INTF" (interface), "FUGR" (function group). See ObjectURI for supported types.
 	Type  string `json:"type"`
 	Name  string `json:"name"`
-	URI   string `json:"uri"` // empty for unsupported types
+	URI   string `json:"uri"` // empty for unsupported types; see ObjectURI
 }
 
 // Tools holds the ADT client and exposes the three agent tools as methods.
