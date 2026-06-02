@@ -32,6 +32,7 @@ func Register(api *gin.RouterGroup, rootCtx context.Context, store reviewstore.J
 
 func postReview(rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, _ ui.Templates) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// tmpl is unused: POST response is a hardcoded HTML bootstrap fragment
 		var req reviewRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest, "transport_request_id is required", nil)

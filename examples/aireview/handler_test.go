@@ -43,10 +43,10 @@ func (f *fakeStore) Get(_ context.Context, _ string) (*reviewstore.Job, error) {
 	return f.job, f.getErr
 }
 func (f *fakeStore) MarkRunning(_ context.Context, _ string) error { return nil }
-func (f *fakeStore) MarkDone(_ context.Context, _ string, html string) error {
+func (f *fakeStore) MarkDone(_ context.Context, _ string, md string) error {
 	f.job.Status = reviewstore.JobStatusDone
-	f.job.ReviewHTML = html
-	f.doneCh <- html
+	f.job.ReviewHTML = md
+	f.doneCh <- md
 	return nil
 }
 func (f *fakeStore) MarkFailed(_ context.Context, _ string, errMsg string) error {
