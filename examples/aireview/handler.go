@@ -26,6 +26,8 @@ type reviewRequest struct {
 	TransportRequestID string `json:"transport_request_id" binding:"required,uppercase,min=9,max=10"`
 }
 
+const contentTypeHTML = "text/html; charset=utf-8"
+
 // Register attaches the two aireview routes to the JWT-guarded api group.
 // rootCtx must be the server's root context (not a request context) so the
 // goroutine continues after the HTTP response is written.
@@ -65,7 +67,7 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 				`<div hx-get="/api/reviews/%s/status" hx-trigger="every 3s" hx-swap="outerHTML">⏳ Starting…</div>`,
 			job.ID, job.ID,
 		)
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(fragment))
+		c.Data(http.StatusOK, contentTypeHTML, []byte(fragment))
 	}
 }
 
@@ -83,6 +85,6 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 			btp.AbortError(c, http.StatusInternalServerError, btp.CodeInternal, "render failed", err)
 			return
 		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
 	}
 }
