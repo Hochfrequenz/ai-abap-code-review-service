@@ -42,15 +42,16 @@ func (s *memoryStore) Get(_ context.Context, id string) (*Job, error) {
 	if !ok {
 		return nil, fmt.Errorf("job %q not found", id)
 	}
-	return job, nil
+	cp := *job
+	return &cp, nil
 }
 
 func (s *memoryStore) MarkRunning(_ context.Context, id string) error {
 	return s.update(id, func(j *Job) { j.Status = JobStatusRunning })
 }
 
-func (s *memoryStore) MarkDone(_ context.Context, id string, reviewHTML string) error {
-	html, err := renderMarkdown(reviewHTML)
+func (s *memoryStore) MarkDone(_ context.Context, id string, reviewMarkdown string) error {
+	html, err := renderMarkdown(reviewMarkdown)
 	if err != nil {
 		return err
 	}

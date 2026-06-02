@@ -29,6 +29,6 @@ type JobStore interface {
 	Create(ctx context.Context, trID string) (*Job, error)
 	Get(ctx context.Context, id string) (*Job, error)
 	MarkRunning(ctx context.Context, id string) error
-	MarkDone(ctx context.Context, id string, reviewHTML string) error
+	MarkDone(ctx context.Context, id string, reviewMarkdown string) error
 	MarkFailed(ctx context.Context, id string, errMsg string) error
 }

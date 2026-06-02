@@ -38,7 +38,7 @@ func TestMarkDone_StoresHTMLAndTimestamp(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
 	job, _ := store.Create(context.Background(), "TR001")
 
-	err := store.MarkDone(context.Background(), job.ID, "<h1>Review</h1>")
+	err := store.MarkDone(context.Background(), job.ID, "# Review\n\nLooks good.")
 	if err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}
@@ -47,8 +47,8 @@ func TestMarkDone_StoresHTMLAndTimestamp(t *testing.T) {
 	if got.Status != reviewstore.JobStatusDone {
 		t.Errorf("Status: got %q, want done", got.Status)
 	}
-	if !strings.Contains(got.ReviewHTML, "<h1>Review</h1>") {
-		t.Errorf("ReviewHTML missing expected content, got: %q", got.ReviewHTML)
+	if !strings.Contains(got.ReviewHTML, "<h1>") {
+		t.Errorf("ReviewHTML missing expected <h1> tag, got: %q", got.ReviewHTML)
 	}
 	if got.FinishedAt == nil {
 		t.Error("FinishedAt should be set")
