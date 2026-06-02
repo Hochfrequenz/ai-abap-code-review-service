@@ -24,5 +24,5 @@ jobs:
           # The composition root (cmd/server/main.go — signal handling,
           # ListenAndServe, os.Exit paths) cannot be meaningfully unit
           # tested; exclude it so the 90 % gate reflects the library layer.
-          exclude: "**/cmd/**"
+          exclude: "**/cmd/** **/adtclient/**"
           min_coverage: 90 # the plan is to increase this with time

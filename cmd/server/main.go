@@ -266,24 +266,6 @@ func buildRouter(
 	return r
 }
 
-// buildUserAgent derives a traceable User-Agent from the compiled binary's
-// module path and version. SAP-side access logs and oncall traces will see
-// "my-service/v1.2.3" rather than the template's literal name.
-// debug.ReadBuildInfo can fail for unusual build setups (test binaries,
-// `go run`); the fallback keeps the service bootable.
-func buildUserAgent() string {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if p := info.Main.Path; p != "" && p != "command-line-arguments" {
-			ver := info.Main.Version
-			if ver == "" || ver == "(devel)" {
-				ver = "dev"
-			}
-			return p + "/" + ver
-		}
-	}
-	return btp.DefaultUserAgent
-}
-
 // recoverPanic replaces gin.Recovery() so panic responses honour the
 // typed btp.ErrorEnvelope contract. Default gin.Recovery in ReleaseMode
 // writes "Internal Server Error" as text/plain — a client that switches
