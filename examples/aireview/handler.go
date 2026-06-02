@@ -76,6 +76,10 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 		id := c.Param("id")
 		job, err := store.Get(c.Request.Context(), id)
 		if err != nil {
+			// store.Get returns an error only when the id is not found — the in-memory
+			// store never fails for any other reason. A persistent store implementation
+			// should map "not found" to a sentinel error and propagate other errors as
+			// CodeInternal.
 			btp.AbortError(c, http.StatusNotFound, btp.CodeNotFound, "review not found", err)
 			return
 		}
