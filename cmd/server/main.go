@@ -187,16 +187,10 @@ func logLevelFromEnv() slog.Level {
 }
 
 // buildRouter wires the Gin router from its abstract dependencies.
-// Handlers added here are decoupled from any internal btp refactor.
-//
-// Routes follow the constrained-proxy pattern: every endpoint has a
-// fixed method, a fixed destination name, and a fixed SAP path baked
-// in at the registration site. A transparent
-// `api.Any("/sap/:destination/*path", …)` route is convenient but
-// untyped by definition, and it turns the service into a tunnel that
-// carries the destination's technical-user authority to any
-// authenticated BTP caller. Forks that genuinely need one should wire
-// `svc.ProxyHandler` themselves, gated behind `btp.RequireScope`.
+// This service does NOT wire a transparent proxy route (api.Any("/sap/*path"))
+// because untyped pass-through routes carry the destination's technical-user
+// authority to any authenticated BTP caller. Instead every route has a fixed
+// method and a fixed handler — the constrained-proxy pattern.
 func buildRouter(
 	validator *btp.JWTValidator,
 	logger *slog.Logger,
