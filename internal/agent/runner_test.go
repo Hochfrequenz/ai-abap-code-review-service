@@ -82,87 +82,65 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	}
 }
 
-func TestRunner_DispatchFetchSource(t *testing.T) {
-	callCount := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewDecoder(r.Body).Decode(&map[string]any{})
-		if callCount == 1 {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id": "msg_01", "type": "message", "role": "assistant",
-				"model": "claude-opus-4-8", "stop_reason": "tool_use",
-				"content": []map[string]any{{
-					"type": "tool_use", "id": "t1", "name": "fetch_source",
-					"input": map[string]any{"object_uri": "/sap/bc/adt/oo/classes/zcl_foo"},
-				}},
-				"usage": map[string]any{"input_tokens": 10, "output_tokens": 5},
-			})
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id": "msg_02", "type": "message", "role": "assistant",
-			"model": "claude-opus-4-8", "stop_reason": "end_turn",
-			"content": []map[string]any{{"type": "text", "text": "# Review\n\nSource looks good."}},
-			"usage": map[string]any{"input_tokens": 20, "output_tokens": 10},
+func TestRunner_DispatchTools(t *testing.T) {
+	tests := []struct {
+		name      string
+		toolName  string
+		toolInput map[string]any
+		sources   map[string]string
+	}{
+		{
+			name:      "fetch_source",
+			toolName:  "fetch_source",
+			toolInput: map[string]any{"object_uri": "/sap/bc/adt/oo/classes/zcl_foo"},
+			sources:   map[string]string{"/sap/bc/adt/oo/classes/zcl_foo": "CLASS zcl_foo DEFINITION."},
+		},
+		{
+			name:      "fetch_class_includes",
+			toolName:  "fetch_class_includes",
+			toolInput: map[string]any{"class_uri": "/sap/bc/adt/oo/classes/zcl_foo"},
+			sources:   map[string]string{"/sap/bc/adt/oo/classes/zcl_foo/definitions": "DEFINITION."},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callCount := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				callCount++
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewDecoder(r.Body).Decode(&map[string]any{})
+				if callCount == 1 {
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"id": "msg_01", "type": "message", "role": "assistant",
+						"model": "claude-opus-4-8", "stop_reason": "tool_use",
+						"content": []map[string]any{{
+							"type": "tool_use", "id": "t1", "name": tt.toolName, "input": tt.toolInput,
+						}},
+						"usage": map[string]any{"input_tokens": 10, "output_tokens": 5},
+					})
+					return
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id": "msg_02", "type": "message", "role": "assistant",
+					"model": "claude-opus-4-8", "stop_reason": "end_turn",
+					"content": []map[string]any{{"type": "text", "text": "# Review\n\nLooks good."}},
+					"usage": map[string]any{"input_tokens": 20, "output_tokens": 10},
+				})
+			}))
+			defer srv.Close()
+
+			fake := &fakeADTClient{sources: tt.sources}
+			tools := agent.NewTools(fake)
+			claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
+			runner := agent.NewRunner(tools, claudeClient)
+			result, err := runner.Run(context.Background(), "NPLK900014")
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if !strings.Contains(result, "Review") {
+				t.Errorf("expected review, got: %q", result)
+			}
 		})
-	}))
-	defer srv.Close()
-
-	fake := &fakeADTClient{sources: map[string]string{
-		"/sap/bc/adt/oo/classes/zcl_foo": "CLASS zcl_foo DEFINITION.",
-	}}
-	tools := agent.NewTools(fake)
-	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
-	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014")
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if !strings.Contains(result, "Review") {
-		t.Errorf("expected review, got: %q", result)
-	}
-}
-
-func TestRunner_DispatchFetchClassIncludes(t *testing.T) {
-	callCount := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewDecoder(r.Body).Decode(&map[string]any{})
-		if callCount == 1 {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id": "msg_01", "type": "message", "role": "assistant",
-				"model": "claude-opus-4-8", "stop_reason": "tool_use",
-				"content": []map[string]any{{
-					"type": "tool_use", "id": "t1", "name": "fetch_class_includes",
-					"input": map[string]any{"class_uri": "/sap/bc/adt/oo/classes/zcl_foo"},
-				}},
-				"usage": map[string]any{"input_tokens": 10, "output_tokens": 5},
-			})
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id": "msg_02", "type": "message", "role": "assistant",
-			"model": "claude-opus-4-8", "stop_reason": "end_turn",
-			"content": []map[string]any{{"type": "text", "text": "# Review\n\nIncludes look good."}},
-			"usage": map[string]any{"input_tokens": 20, "output_tokens": 10},
-		})
-	}))
-	defer srv.Close()
-
-	fake := &fakeADTClient{sources: map[string]string{
-		"/sap/bc/adt/oo/classes/zcl_foo/definitions": "DEFINITION.",
-	}}
-	tools := agent.NewTools(fake)
-	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
-	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014")
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if !strings.Contains(result, "Review") {
-		t.Errorf("expected review, got: %q", result)
 	}
 }
 
