@@ -57,14 +57,15 @@ func main() {
 
 	store := reviewstore.NewMemoryStore()
 	agentTools := agent.NewTools(adtClient)
+	// anthropic.NewClient reads ANTHROPIC_API_KEY from env — this is the
+	// documented default env var for the Anthropic Go SDK (anthropic.NewClient
+	// with no explicit key option falls back to os.Getenv("ANTHROPIC_API_KEY")).
 	claudeClient := anthropic.NewClient(
 		// "anthropic-beta: prompt-caching-2024-07-31" enables Anthropic's prompt
 		// caching API (see https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching).
 		// The SDK does not set this header automatically; it must be opted into explicitly.
 		option.WithHeader("anthropic-beta", "prompt-caching-2024-07-31"),
-	) // reads ANTHROPIC_API_KEY from env — this is the documented default env var
-	// for the Anthropic Go SDK (anthropic.NewClient with no explicit key option
-	// falls back to os.Getenv("ANTHROPIC_API_KEY")).
+	)
 	runner := agent.NewRunner(agentTools, claudeClient)
 	tmpl := ui.MustLoadTemplates()
 
