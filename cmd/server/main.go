@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/gin-gonic/gin"
 
 	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/aireview"
@@ -56,7 +57,9 @@ func main() {
 
 	store := reviewstore.NewMemoryStore()
 	agentTools := agent.NewTools(adtClient)
-	claudeClient := anthropic.NewClient() // reads ANTHROPIC_API_KEY from env
+	claudeClient := anthropic.NewClient(
+		option.WithHeader("anthropic-beta", "prompt-caching-2024-07-31"),
+	) // reads ANTHROPIC_API_KEY from env
 	runner := agent.NewRunner(agentTools, claudeClient)
 	tmpl := ui.MustLoadTemplates()
 

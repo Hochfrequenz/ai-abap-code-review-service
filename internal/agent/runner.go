@@ -18,6 +18,10 @@ const reviewModel = anthropic.ModelClaudeOpus4_8
 // Increase if large transports produce truncated reviews.
 const reviewMaxTokens = int64(8192)
 
+// reviewMaxToolLoops caps the tool-use iterations per review to prevent
+// runaway API spend if the model loops without progressing.
+const reviewMaxToolLoops = 50
+
 //go:embed prompts/review_prompt.md
 var systemPrompt string
 
@@ -44,12 +48,15 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 
 	toolDefs := r.buildToolDefs()
 
-	for {
+	for range reviewMaxToolLoops {
 		resp, err := r.client.Messages.New(ctx, anthropic.MessageNewParams{
 			Model:     reviewModel,
 			MaxTokens: reviewMaxTokens,
 			System: []anthropic.TextBlockParam{
-				{Text: systemPrompt},
+				{
+					Text:         systemPrompt,
+					CacheControl: anthropic.NewCacheControlEphemeralParam(),
+				},
 			},
 			Tools:    toolDefs,
 			Messages: messages,
@@ -60,13 +67,17 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 
 		messages = append(messages, resp.ToParam())
 
-		if resp.StopReason == anthropic.StopReasonEndTurn {
+		if resp.StopReason == anthropic.StopReasonEndTurn || resp.StopReason == "max_tokens" {
 			for _, block := range resp.Content {
 				if block.Type == "text" {
-					return block.Text, nil
+					text := block.Text
+					if resp.StopReason == "max_tokens" {
+						text += "\n\n---\n*Review truncated: output token limit reached.*"
+					}
+					return text, nil
 				}
 			}
-			return "", fmt.Errorf("end_turn but no text block in response")
+			return "", fmt.Errorf("no text block in response (stop_reason: %s)", resp.StopReason)
 		}
 
 		if resp.StopReason != anthropic.StopReasonToolUse {
@@ -89,6 +100,7 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 		}
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
+	return "", fmt.Errorf("review did not complete within %d tool-use iterations", reviewMaxToolLoops)
 }
 
 func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMessage) (string, error) {

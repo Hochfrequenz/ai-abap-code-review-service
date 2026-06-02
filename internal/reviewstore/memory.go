@@ -31,8 +31,9 @@ func (s *memoryStore) Create(_ context.Context, trID string) (*Job, error) {
 	}
 	s.mu.Lock()
 	s.jobs[job.ID] = job
+	cp := *job // copy before unlock — callers must not alias the stored pointer
 	s.mu.Unlock()
-	return job, nil
+	return &cp, nil
 }
 
 func (s *memoryStore) Get(_ context.Context, id string) (*Job, error) {
