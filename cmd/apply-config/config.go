@@ -171,6 +171,10 @@ func (c *Config) Validate() error {
 		errs = append(errs, "cf.domain is required")
 	}
 
+	if matched, _ := regexp.MatchString(`^\d{3}$`, c.Examples.SapClient); !matched {
+		errs = append(errs, fmt.Sprintf("examples.sap_client %q must be a three-digit number (000–999)", c.Examples.SapClient))
+	}
+
 	for _, s := range []struct{ name, val string }{
 		{"services.xsuaa", c.Services.XSUAA},
 		{"services.destination", c.Services.Destination},
