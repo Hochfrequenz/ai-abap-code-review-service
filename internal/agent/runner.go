@@ -9,8 +9,8 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
-// FORK: reviewModel is the Claude model used for ABAP code reviews.
-// apply-config does not rewrite this — change it directly for your fork.
+// reviewModel is the Claude model used for ABAP code reviews.
+// Change directly in this file if you want a different model.
 // Options: anthropic.ModelClaudeOpus4_8 (best quality), anthropic.ModelClaudeSonnet4_5 (faster/cheaper).
 const reviewModel = anthropic.ModelClaudeOpus4_8
 
@@ -22,6 +22,8 @@ const reviewMaxTokens = int64(8192)
 // runaway API spend if the model loops without progressing.
 const reviewMaxToolLoops = 50
 
+// systemPrompt is the Claude system prompt embedded at build time.
+// Edit internal/agent/prompts/review_prompt.md to customise review criteria.
 //go:embed prompts/review_prompt.md
 var systemPrompt string
 
