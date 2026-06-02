@@ -70,7 +70,7 @@ func newRouter(store reviewstore.JobStore, runner aireview.ReviewRunner, tmpl ui
 }
 
 func TestPost_ValidBody_Returns200WithLink(t *testing.T) {
-	store := newFakeStore("test-uuid-1")
+	store := newFakeStore("00000000-0000-0000-0000-000000000001")
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
@@ -92,7 +92,7 @@ func TestPost_ValidBody_Returns200WithLink(t *testing.T) {
 }
 
 func TestPost_EmptyBody_Returns400(t *testing.T) {
-	store := newFakeStore("test-uuid-2")
+	store := newFakeStore("00000000-0000-0000-0000-000000000002")
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
@@ -107,7 +107,7 @@ func TestPost_EmptyBody_Returns400(t *testing.T) {
 }
 
 func TestPost_GoroutineCallsMarkDone(t *testing.T) {
-	store := newFakeStore("test-uuid-3")
+	store := newFakeStore("00000000-0000-0000-0000-000000000003")
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
@@ -128,11 +128,11 @@ func TestPost_GoroutineCallsMarkDone(t *testing.T) {
 }
 
 func TestGetStatus_Pending_HasPolling(t *testing.T) {
-	store := newFakeStore("test-uuid-4")
+	store := newFakeStore("00000000-0000-0000-0000-000000000004")
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/reviews/test-uuid-4/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/reviews/00000000-0000-0000-0000-000000000004/status", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -143,19 +143,19 @@ func TestGetStatus_Pending_HasPolling(t *testing.T) {
 	if !strings.Contains(body, `hx-trigger="every 3s"`) {
 		t.Error("pending response must contain hx-trigger")
 	}
-	if !strings.Contains(body, `/api/reviews/test-uuid-4/status`) {
+	if !strings.Contains(body, `/api/reviews/00000000-0000-0000-0000-000000000004/status`) {
 		t.Error("pending response must contain correct hx-get URL")
 	}
 }
 
 func TestGetStatus_Done_HasContentNoPoll(t *testing.T) {
-	store := newFakeStore("test-uuid-5")
+	store := newFakeStore("00000000-0000-0000-0000-000000000005")
 	store.job.Status = reviewstore.JobStatusDone
 	store.job.ReviewHTML = "<p>LGTM</p>"
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/reviews/test-uuid-5/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/reviews/00000000-0000-0000-0000-000000000005/status", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -169,7 +169,7 @@ func TestGetStatus_Done_HasContentNoPoll(t *testing.T) {
 }
 
 func TestGetStatus_UnknownID_Returns404(t *testing.T) {
-	store := newFakeStore("test-uuid-6")
+	store := newFakeStore("00000000-0000-0000-0000-000000000006")
 	store.getErr = fmt.Errorf("job not found")
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
