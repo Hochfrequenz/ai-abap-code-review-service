@@ -18,13 +18,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
 
 	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/adtcheckrun"
 	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/adtdiscovery"
+	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/aireview"
+	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/adtclient"
+	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/agent"
 	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
+	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/ui"
 )
 
 func main() {
@@ -52,7 +58,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	r := buildRouter(validator, svc, svc, logger)
+	adtClient, err := adtclient.NewFromBTPEnv(ctx, *env)
+	if err != nil {
+		logger.Error("adtler client init failed", "err", err)
+		os.Exit(1)
+	}
+
+	store := reviewstore.NewMemoryStore()
+	agentTools := agent.NewTools(adtClient)
+	claudeClient := anthropic.NewClient() // reads ANTHROPIC_API_KEY from env
+	runner := agent.NewRunner(agentTools, claudeClient)
+	tmpl := ui.MustLoadTemplates()
+
+	r := buildRouter(validator, svc, svc, logger, store, runner, tmpl, ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -184,7 +202,16 @@ func logLevelFromEnv() slog.Level {
 // authority to any authenticated BTP caller. The template ships
 // without such a route; forks that genuinely need one should wire
 // `svc.ProxyHandler` themselves, gated behind `btp.RequireScope`.
-func buildRouter(validator *btp.JWTValidator, caller btp.OnPremCaller, mutator btp.OnPremMutator, logger *slog.Logger) *gin.Engine {
+func buildRouter(
+	validator *btp.JWTValidator,
+	caller btp.OnPremCaller,
+	mutator btp.OnPremMutator,
+	logger *slog.Logger,
+	store reviewstore.JobStore,
+	runner aireview.ReviewRunner,
+	tmpl ui.Templates,
+	rootCtx context.Context,
+) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	// The backend app is directly reachable on its .cfapps.* route, not
@@ -256,6 +283,33 @@ func buildRouter(validator *btp.JWTValidator, caller btp.OnPremCaller, mutator b
 	//                               huma's context.Context.
 	adtdiscovery.Register(hapi, caller)
 	adtcheckrun.Register(api, mutator)
+
+	// UI routes (no JWT — HTML shells; HTMX API calls under /api are JWT-gated)
+	r.GET("/", func(c *gin.Context) {
+		html, err := tmpl.RenderIndex()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "template error")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+	})
+	r.GET("/reviews/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		job, err := store.Get(c.Request.Context(), id)
+		if err != nil {
+			c.String(http.StatusNotFound, "review not found")
+			return
+		}
+		html, err := tmpl.RenderReview(job)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "template error")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+	})
+
+	// HTMX API routes (JWT-gated via the api group)
+	aireview.Register(api, rootCtx, store, runner, tmpl)
 
 	return r
 }
