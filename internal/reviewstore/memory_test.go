@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
 )
 
 func TestCreate_ReturnsJobWithPendingStatus(t *testing.T) {

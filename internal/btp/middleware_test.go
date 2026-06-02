@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
 func Test_RequestID_GeneratesWhenAbsent(t *testing.T) {

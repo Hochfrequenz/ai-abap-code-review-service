@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Hochfrequenz/adtler/adt"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/agent"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
 )
 
 func TestObjectURI_KnownTypes(t *testing.T) {

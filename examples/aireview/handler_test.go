@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/aireview"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/ui"
+	"github.com/hochfrequenz/ai-abap-code-review-service/examples/aireview"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
 
 type fakeStore struct {

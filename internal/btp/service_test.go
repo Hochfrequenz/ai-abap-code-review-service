@@ -18,7 +18,7 @@ import (
 	"github.com/corbym/gocrest/then"
 	"github.com/gin-gonic/gin"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
 // btpStack spins up three httptest servers standing in for XSUAA, the

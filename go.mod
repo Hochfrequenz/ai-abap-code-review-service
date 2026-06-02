@@ -1,4 +1,4 @@
-module github.com/hochfrequenz/go-sap-btp-cf-template
+module github.com/hochfrequenz/ai-abap-code-review-service
 
 go 1.26
 

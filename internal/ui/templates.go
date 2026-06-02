@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"html/template"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
 )
 
 //go:embed templates/*

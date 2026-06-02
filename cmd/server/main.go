@@ -22,12 +22,12 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/gin-gonic/gin"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/aireview"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/adtclient"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/agent"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/ui"
+	"github.com/hochfrequenz/ai-abap-code-review-service/examples/aireview"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/adtclient"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"github.com/Hochfrequenz/adtler/adt"
 	sapmcpconfig "github.com/Hochfrequenz/sap-mcp-config"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
 // FORK: "HF_S4" is the BTP destination name. "100" is the SAP client number.

@@ -13,7 +13,7 @@ import (
 	"github.com/corbym/gocrest/is"
 	"github.com/corbym/gocrest/then"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
 func Test_NewOnPremiseTransport_RejectsNilConn(t *testing.T) {

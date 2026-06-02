@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/ui"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
 
 // ReviewRunner is the interface the handler uses to start a review.

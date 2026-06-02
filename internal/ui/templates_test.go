@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/reviewstore"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/ui"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
 
 func pendingJob() *reviewstore.Job {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/agent"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
 )
 
 func TestRunner_ToolLoopAndFinalText(t *testing.T) {

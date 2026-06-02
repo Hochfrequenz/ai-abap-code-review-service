@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/Hochfrequenz/adtler/adt"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/agent"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
 )
 
 // fakeADTClient implements the subset of adt.Client the tools need.
