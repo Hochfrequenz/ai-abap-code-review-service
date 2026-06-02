@@ -21,7 +21,9 @@ type ReviewRunner interface {
 }
 
 type reviewRequest struct {
-	TransportRequestID string `json:"transport_request_id" binding:"required"`
+	// TransportRequestID is a SAP CTS transport request number.
+	// Format: 2-letter system prefix + K + 6 digits, all uppercase — e.g. NPLK900014.
+	TransportRequestID string `json:"transport_request_id" binding:"required,uppercase,min=9,max=10"`
 }
 
 // Register attaches the two aireview routes to the JWT-guarded api group.
