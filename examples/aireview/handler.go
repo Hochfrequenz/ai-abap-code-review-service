@@ -12,8 +12,10 @@ import (
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
 
-// ReviewRunner is the interface the handler uses to start a review.
-// Satisfied by *agent.Runner in production and fakeRunner in tests.
+// ReviewRunner is the single point of coupling between the HTTP handler and the
+// AI backend. Swap the implementation in cmd/server/main.go to replace Claude
+// with a different AI provider (e.g. OpenAI, Gemini) without touching the
+// handler or any other layer.
 type ReviewRunner interface {
 	Run(ctx context.Context, trID string) (string, error)
 }
