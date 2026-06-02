@@ -24,7 +24,7 @@ flowchart LR
 
 ## Quick start
 
-1. Copy and fill `config.yml` — at minimum `examples.destination_name` and `examples.sap_client`
+1. **If deploying your own instance:** fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run `go run ./cmd/apply-config` — see [#2](../../issues/2) for the full field list
 2. Set `ANTHROPIC_API_KEY` in your CF environment: `cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...`
 3. Customize the review prompt: edit `internal/agent/prompts/review_prompt.md`
 4. Run `go run ./cmd/apply-config` to rewrite the tree for your fork
