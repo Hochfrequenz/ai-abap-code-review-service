@@ -439,7 +439,7 @@ func planExamplesDestination(root string, cfg *Config) ([]pending, error) {
 		if readErr != nil {
 			return readErr
 		}
-		newContent := re.ReplaceAll(old, replacement)
+		newContent := re.ReplaceAllLiteral(old, replacement)
 		rel, _ := filepath.Rel(root, p)
 		out = append(out, pending{
 			absPath: p,
@@ -479,7 +479,7 @@ func planAdtClientSapClient(root string, cfg *Config) ([]pending, error) {
 		return []pending{{absPath: path, result: RewriterResult{Name: "adtclient sap_client", Path: rel, Before: old, After: old}}}, nil
 	}
 
-	newContent := re.ReplaceAll(old, []byte(`sapClientNumber = "`+desired+`"`))
+	newContent := re.ReplaceAllLiteral(old, []byte(`sapClientNumber = "`+desired+`"`))
 	return []pending{{
 		absPath: path,
 		result:  RewriterResult{Name: "adtclient sap_client", Path: rel, Before: old, After: newContent},

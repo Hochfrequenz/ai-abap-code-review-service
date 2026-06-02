@@ -78,6 +78,17 @@ func TestFetchSource_ReturnsSource(t *testing.T) {
 	}
 }
 
+func TestFetchClassIncludes_CancelledContext_ReturnsError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already cancelled
+	fake := &fakeADTClient{sources: map[string]string{}}
+	tools := agent.NewTools(fake)
+	_, err := tools.FetchClassIncludes(ctx, "/sap/bc/adt/oo/classes/zcl_foo")
+	if err == nil {
+		t.Error("expected error for cancelled context")
+	}
+}
+
 func TestFetchClassIncludes_ReturnsAvailableIncludes(t *testing.T) {
 	fake := &fakeADTClient{
 		sources: map[string]string{

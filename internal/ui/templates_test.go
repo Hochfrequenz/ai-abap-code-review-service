@@ -59,6 +59,28 @@ func TestStatusFragment_Failed_HasErrorNoPoll(t *testing.T) {
 	}
 }
 
+func TestRenderIndex_NoError(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	if !strings.Contains(out, "hx-post") {
+		t.Error("index page must contain HTMX form")
+	}
+}
+
+func TestRenderReview_ContainsTRID(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderReview(doneJob())
+	if err != nil {
+		t.Fatalf("RenderReview: %v", err)
+	}
+	if !strings.Contains(out, "NPLK900014") {
+		t.Error("review page must contain TRID")
+	}
+}
+
 func mustRenderStatus(t *testing.T, tmpl ui.Templates, job *reviewstore.Job) string {
 	t.Helper()
 	out, err := tmpl.RenderStatus(job)

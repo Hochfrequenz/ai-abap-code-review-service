@@ -67,9 +67,12 @@ func (t *Tools) FetchClassIncludes(ctx context.Context, classURI string) (map[st
 	includes := []string{"definitions", "implementations", "testclasses", "macros"}
 	out := make(map[string]string)
 	for _, inc := range includes {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		res, err := t.client.GetIncludeSource(ctx, classURI, inc)
 		if err != nil {
-			continue // absent include — not an error
+			continue // absent include on this SAP system — not an error
 		}
 		out[inc] = res.Source
 	}
