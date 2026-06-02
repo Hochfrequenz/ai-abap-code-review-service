@@ -30,6 +30,14 @@ flowchart LR
 5. `cf push` (cross-compile first: `make build-linux` or `.\scripts\build.ps1`)
 6. Open `https://<your-approuter-host>/` and enter a transport request number
 
+## Local development
+
+**The server cannot run locally without BTP.** `cmd/server/main.go` calls `btp.LoadEnv()` on startup, which reads `VCAP_SERVICES` and `VCAP_APPLICATION` — CF-injected environment variables that are absent on a developer laptop. If they are missing the server refuses to start. This is intentional: there is no meaningful stub mode for the three-leg BTP dance (XSUAA → Destination → Cloud Connector).
+
+Unit tests (`go test ./...`) run without any BTP or SAP credentials — they use fakes throughout.
+
+For integration tests against a real SAP system see issue #5 — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
+
 ## How it works
 
 1. **Submit** — the user enters a transport request ID (e.g. `DEVK900123`) at `GET /`.
