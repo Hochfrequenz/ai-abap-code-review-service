@@ -40,6 +40,9 @@ examples:
   # The BTP destination name your example handlers reference.
   # Match it to the destination you create in your subaccount.
   destination_name: HF_S4
+  # The three-digit SAP client number passed to the ADT client.
+  # Match it to the client configured in your SAP system.
+  sap_client: "100"
 
 # CF landscape coordinates used by the release-triggered CD workflow
 # (.github/workflows/deploy.yml). Match your BTP subaccount.
