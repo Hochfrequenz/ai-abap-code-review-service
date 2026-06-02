@@ -1,6 +1,8 @@
 <!-- FORK: This file is the primary customisation point for the AI code review.
+     Location: internal/agent/prompts/review_prompt.md
      Edit the review criteria, style guide, and output format to match your
-     organisation's standards. The file is embedded at build time. -->
+     organisation's standards. The file is embedded at build time via
+     //go:embed in internal/agent/runner.go. -->
 
 # ABAP Code Review Instructions
 
