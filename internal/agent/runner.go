@@ -9,6 +9,15 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
+// FORK: reviewModel is the Claude model used for ABAP code reviews.
+// apply-config does not rewrite this — change it directly for your fork.
+// Options: anthropic.ModelClaudeOpus4_8 (best quality), anthropic.ModelClaudeSonnet4_5 (faster/cheaper).
+const reviewModel = anthropic.ModelClaudeOpus4_8
+
+// reviewMaxTokens is the maximum output token budget for the review.
+// Increase if large transports produce truncated reviews.
+const reviewMaxTokens = int64(8192)
+
 //go:embed prompts/review_prompt.md
 var systemPrompt string
 
@@ -37,8 +46,8 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 
 	for {
 		resp, err := r.client.Messages.New(ctx, anthropic.MessageNewParams{
-			Model:     anthropic.ModelClaudeOpus4_8,
-			MaxTokens: 8192,
+			Model:     reviewModel,
+			MaxTokens: reviewMaxTokens,
 			System: []anthropic.TextBlockParam{
 				{Text: systemPrompt},
 			},
@@ -75,6 +84,9 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 			}
 			toolResults = append(toolResults, anthropic.NewToolResultBlock(block.ID, result, callErr != nil))
 		}
+		if len(toolResults) == 0 {
+			return "", fmt.Errorf("stop_reason tool_use but no tool_use blocks in response")
+		}
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
 }
@@ -92,7 +104,10 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, _ := json.Marshal(objs)
+		out, err := json.Marshal(objs)
+		if err != nil {
+			return "", fmt.Errorf("marshal tool result: %w", err)
+		}
 		return string(out), nil
 
 	case "fetch_source":
@@ -115,7 +130,10 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, _ := json.Marshal(includes)
+		out, err := json.Marshal(includes)
+		if err != nil {
+			return "", fmt.Errorf("marshal tool result: %w", err)
+		}
 		return string(out), nil
 
 	default:
