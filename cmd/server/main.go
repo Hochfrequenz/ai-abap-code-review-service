@@ -186,6 +186,8 @@ func logLevelFromEnv() slog.Level {
 	}
 }
 
+const contentTypeHTML = "text/html; charset=utf-8"
+
 // buildRouter wires the Gin router from its abstract dependencies.
 // This service does NOT wire a transparent proxy route (api.Any("/sap/*path"))
 // because untyped pass-through routes carry the destination's technical-user
@@ -243,7 +245,7 @@ func buildRouter(
 			c.String(http.StatusInternalServerError, "template error")
 			return
 		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
 	})
 	r.GET("/reviews/:id", func(c *gin.Context) {
 		id := c.Param("id")
@@ -257,7 +259,7 @@ func buildRouter(
 			c.String(http.StatusInternalServerError, "template error")
 			return
 		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
 	})
 
 	// HTMX API routes (JWT-gated via the api group)
