@@ -24,6 +24,7 @@ const reviewMaxToolLoops = 50
 
 // systemPrompt is the Claude system prompt embedded at build time.
 // Edit internal/agent/prompts/review_prompt.md to customise review criteria.
+//
 //go:embed prompts/review_prompt.md
 var systemPrompt string
 

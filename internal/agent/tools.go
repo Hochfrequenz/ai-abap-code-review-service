@@ -23,9 +23,9 @@ type TRObject struct {
 	PgmID string `json:"pgmid"`
 	// Type is the SAP object type code — e.g. "PROG" (program), "CLAS" (class),
 	// "INTF" (interface), "FUGR" (function group). See ObjectURI for supported types.
-	Type  string `json:"type"`
-	Name  string `json:"name"`
-	URI   string `json:"uri"` // empty for unsupported types; see ObjectURI
+	Type string `json:"type"`
+	Name string `json:"name"`
+	URI  string `json:"uri"` // empty for unsupported types; see ObjectURI
 }
 
 // Tools holds the ADT client and exposes the three agent tools as methods.
