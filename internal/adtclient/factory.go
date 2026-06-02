@@ -12,11 +12,13 @@ import (
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
-// FORK: "HF_S4" is the BTP destination name. "100" is the SAP client number.
-// apply-config rewrites both from config.yml (examples.destination_name and
-// examples.sap_client) when you fork this repo.
+// destinationName is the BTP Destination configured for the on-premise SAP system.
+// Update this value in config.yml under examples.destination_name; apply-config
+// rewrites this constant automatically.
 const (
 	destinationName = "HF_S4"
+	// sapClientNumber is the three-digit SAP client number (e.g. "100").
+	// Update via config.yml examples.sap_client; apply-config rewrites this constant.
 	sapClientNumber = "100"
 )
 
