@@ -124,7 +124,7 @@ func TestRunner_DispatchTools(t *testing.T) {
 					"id": "msg_02", "type": "message", "role": "assistant",
 					"model": "claude-opus-4-8", "stop_reason": "end_turn",
 					"content": []map[string]any{{"type": "text", "text": "# Review\n\nLooks good."}},
-					"usage": map[string]any{"input_tokens": 20, "output_tokens": 10},
+					"usage":   map[string]any{"input_tokens": 20, "output_tokens": 10},
 				})
 			}))
 			defer srv.Close()
@@ -152,7 +152,7 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 			"id": "msg_01", "type": "message", "role": "assistant",
 			"model": "claude-opus-4-8", "stop_reason": "max_tokens",
 			"content": []map[string]any{{"type": "text", "text": "# Partial Review"}},
-			"usage": map[string]any{"input_tokens": 100, "output_tokens": 8192},
+			"usage":   map[string]any{"input_tokens": 100, "output_tokens": 8192},
 		})
 	}))
 	defer srv.Close()
@@ -178,7 +178,7 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 			"id": "msg_01", "type": "message", "role": "assistant",
 			"model": "claude-opus-4-8", "stop_reason": "stop_sequence",
 			"content": []map[string]any{},
-			"usage": map[string]any{"input_tokens": 10, "output_tokens": 5},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
 		})
 	}))
 	defer srv.Close()
