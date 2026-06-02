@@ -43,6 +43,10 @@ func (s *memoryStore) Get(_ context.Context, id string) (*Job, error) {
 		return nil, fmt.Errorf("job %q not found", id)
 	}
 	cp := *job
+	if job.FinishedAt != nil {
+		t := *job.FinishedAt
+		cp.FinishedAt = &t
+	}
 	return &cp, nil
 }
 
@@ -85,12 +89,14 @@ func (s *memoryStore) update(id string, fn func(*Job)) error {
 
 func renderMarkdown(md string) (string, error) {
 	var buf bytes.Buffer
-	md_renderer := goldmark.New(
+	// html.WithUnsafe allows Claude-generated HTML (e.g. tables) to pass through.
+	// Input is from the Claude API, not from an untrusted caller.
+	mdRenderer := goldmark.New(
 		goldmark.WithRendererOptions(
 			html.WithUnsafe(),
 		),
 	)
-	if err := md_renderer.Convert([]byte(md), &buf); err != nil {
+	if err := mdRenderer.Convert([]byte(md), &buf); err != nil {
 		return "", fmt.Errorf("render markdown: %w", err)
 	}
 	return buf.String(), nil
