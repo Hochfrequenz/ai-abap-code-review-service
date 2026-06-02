@@ -40,7 +40,7 @@ This is intentional: there is no meaningful stub mode for the three-leg BTP danc
 
 Unit tests (`go test ./...`) run without any BTP or SAP credentials — they use fakes throughout.
 
-For integration tests against a real SAP system see issue #6 — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
+For integration tests against a real SAP system see [issue #6](../../issues/6) — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
 
 ## How it works
 
