@@ -1,7 +1,8 @@
-# go-sap-btp-cf-template
+﻿# AI ABAP Code Review Service
 
-Go starter template for building webservices on **SAP BTP Cloud Foundry** that talk to on-premise SAP systems.
-Fork it, fill in one `config.yml`, `cf push` and you get a production-grade Go backend with **XSUAA authentication**, **Destination + Connectivity + Cloud Connector** wiring, and a **transparent CSRF handshake** on writes, all behind a single `svc.CallOnPremise(…)` call in your handler code.
+An AI-powered code review service for SAP ABAP, running on **SAP BTP Cloud Foundry**. Users submit a transport request ID via a web UI; a Claude agent autonomously fetches ABAP source objects from the on-premise SAP system via ADT, and returns a structured, printable markdown review.
+
+Built on the [go-sap-btp-cf-template](https://github.com/Hochfrequenz/go-sap-btp-cf-template) — all BTP plumbing (XSUAA, Destination, Cloud Connector) is inherited from that template.
 
 ### What's in the box
 
@@ -11,7 +12,10 @@ Fork it, fill in one `config.yml`, `cf push` and you get a production-grade Go b
 | **Authentication**   | XSUAA JWT validation (RS256 signature, audience, expiry) via JWKS — see [`internal/btp/auth.go`](internal/btp/auth.go)                                                                                            |
 | **SAP connectivity** | Three-leg dance (XSUAA → Destination service → Connectivity proxy → Cloud Connector) with pluggable `DestinationAuthenticator` (ships `NoAuthentication` + `BasicAuthentication`; Principal Propagation plugs in) |
 | **CSRF on writes**   | Automatic fetch → attach → retry; one `svc.CallOnPremiseMutating(…)` call                                                                                                                                         |
-| **Typed handlers**   | Two demo endpoints (`GET /api/adt-discovery`, `POST /api/adt-checkrun`) with request validation, typed responses, and one-method-fake tests                                                                       |
+| **AI code review**   | Users submit a SAP transport request ID via `GET /` → Claude fetches ABAP objects via ADT → returns a structured markdown review at `GET /reviews/:id` |
+| **HTMX web UI**      | Minimal, printable web interface — no JavaScript framework, no build step |
+| **Claude agent**     | `internal/agent/` — autonomous tool-use loop: list TR objects → fetch source → fetch class includes → write review |
+| **ADT integration**  | `internal/adtclient/` — adtler v0.2.0 over BTP Connectivity SOCKS5 proxy |
 | **Error envelope**   | `btp.AbortError` + stable JSON error shape with request IDs                                                                                                                                                       |
 | **CI / CD**          | GitHub Actions pipeline: lint, test, template-guards, `cf push` to Cloud Foundry                                                                                                                                  |
 | **Fork tooling**     | `go run ./cmd/apply-config` rewrites module path, app name, CF coordinates, and destination names from `config.yml` — one command, whole tree                                                                     |
@@ -20,22 +24,29 @@ Fork it, fill in one `config.yml`, `cf push` and you get a production-grade Go b
 
 ```mermaid
 flowchart LR
-    Browser([Browser]) --> AR[SAP Approuter<br/><small>JWT login</small>]
-    AR -->|/api/*| Go[Go backend · Gin<br/><small>JWT validation · typed handlers</small>]
-    Go -->|svc.CallOnPremise| DST[Destination Service]
+    Browser([Browser]) --> AR[SAP Approuter\nJWT login]
+    AR -->|GET /| Go[Go backend · Gin\nHTMX UI + review API]
+    AR -->|POST /api/reviews| Go
+    Go -->|tool calls| Agent[Claude Agent\nclaude-opus-4-5]
+    Agent -->|ADT via adtler| DST[Destination Service]
     DST --> CC[Cloud Connector]
-    CC -->|HTTPS + Basic Auth| SAP[On-premise SAP<br/><small>RFC / OData / ADT</small>]
+    CC -->|HTTPS + Basic Auth| SAP[On-premise SAP\nABAPADT]
 
     subgraph SAP BTP Cloud Foundry
         AR
         Go
         DST
     end
-
-    style Go fill:#d1e7dd,stroke:#0f5132,stroke-width:2px,color:#0f5132
-    style SAP fill:#fff3cd,stroke:#664d03,stroke-width:2px,color:#664d03
-    style CC fill:#e9ecef,stroke:#6c757d,stroke-dasharray:5 5,color:#495057
 ```
+
+## Quick start
+
+1. Copy and fill `config.yml` — at minimum `examples.destination_name` and `examples.sap_client`
+2. Set `ANTHROPIC_API_KEY` in your CF environment: `cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...`
+3. Customize the review prompt: edit `internal/agent/prompts/review_prompt.md`
+4. Run `go run ./cmd/apply-config` to rewrite the tree for your fork
+5. `cf push` — see [Deployment](#deployment)
+6. Open `https://<your-approuter-host>/` and enter a transport request number
 
 > 🪧 First time here?
 >
@@ -72,6 +83,14 @@ internal/btp/
   httperr.go                typed error envelope + AbortError helper
   middleware.go             RequestID + RequireScope helpers
   service.go                orchestrates the three-leg call + CSRF handshake for writes
+internal/agent/             Claude tool-use loop; ADT tool definitions; URI builder
+  runner.go                 Claude API client; tool dispatch; markdown review output
+  tools.go                  list_tr_objects / fetch_source / fetch_class_includes
+  prompts/                  embedded review prompt (FORK: edit this for your org)
+internal/adtclient/         adtler BTP factory (bridges internal/btp and adtler)
+internal/reviewstore/       async job store (in-memory; swappable via JobStore interface)
+internal/ui/                embedded HTMX templates; goldmark markdown→HTML renderer
+examples/aireview/          POST /api/reviews + GET /api/reviews/:id/status handlers
 web/                        SAP approuter
   package.json              pulls @sap/approuter
   xs-app.json               routes /api/* to the Go backend destination
@@ -179,52 +198,12 @@ A handler is four mechanical steps:
 
 ```go
 // In buildRouter, next to api.GET("/me", ...):
-api.POST("/invoice-sync", invoiceSyncHandler(svc))
+api.POST("/reviews", reviewHandler(svc))
 ```
 
 #### Steps 2–4: the handler.
 
-The full, typed, compileable example lives at [**`examples/invoicesync/handler.go`**](examples/invoicesync/handler.go) - read that file for the complete pattern (request type with validation tags, `svc.CallOnPremise` call, response streaming).
-
-Here's a mental model-size sketch of what the file contains:
-
-```go
-type Request struct {
-    CompanyCode string    `json:"company_code" binding:"required,len=4,uppercase"`
-    AmountCents int64     `json:"amount_cents" binding:"required,min=1"`
-    // ... more fields with validation tags
-}
-
-func Handler(svc btp.OnPremCaller) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        var req Request
-        if err := c.ShouldBindJSON(&req); err != nil {            // step 2: validate
-            btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
-                err.Error(), nil)                                  //   validator messages are safe to surface
-            return
-        }
-        claims := c.MustGet("jwtClaims").(jwt.MapClaims)          // step 3: know the caller
-        _ = claims["user_name"]
-
-        body, _ := json.Marshal(toABAPPayload(req))
-        resp, err := svc.CallOnPremise(                            // step 4: one call, full chain
-            c.Request.Context(), "HF_S4", http.MethodPost,
-            "/sap/bc/rest/zmy_invoice_sync",
-            http.Header{"Content-Type": {"application/json"}},
-            bytes.NewReader(body),
-        )
-        if err != nil {
-            btp.AbortError(c, http.StatusBadGateway, btp.CodeUpstreamUnreachable,
-                "on-premise call failed", err)                     //   err goes to the log, not the response body
-            return
-        }
-        defer resp.Body.Close()
-
-        c.DataFromReader(resp.StatusCode, resp.ContentLength,      // step 5: shape response
-            resp.Header.Get("Content-Type"), resp.Body, nil)
-    }
-}
-```
+See `examples/aireview/handler.go` for the reference handler pattern used in this service.
 
 The template does **not** ship a transparent-proxy route by default - strict typing at the Gin boundary needs a fixed endpoint set, and the security story is much better when every path is explicit.
 If a fork genuinely wants a catch-all pass-through, `svc.ProxyHandler` is still a method on `*btp.Service`; wire it yourself, gate it with `btp.RequireScope("...User")`, and be deliberate about which users can reach it.
@@ -244,7 +223,7 @@ The same sanitising in Go is a struct tag and one line. Put the discipline as fa
 > If a request can fail validation, it fails here — with a `400` and a clear message - not on the SAP side with a Short Dump.
 > Make use of [Gins integrated validation with validator tags](https://gin-gonic.com/en/docs/binding/binding-and-validation/) on the model structs.
 
-The request type in [`examples/invoicesync/handler.go`](examples/invoicesync/handler.go) is what a validated body looks like in practice; struct tags do the heavy lifting:
+The request type in [`examples/aireview/handler.go`](examples/aireview/handler.go) is what a validated body looks like in practice; struct tags do the heavy lifting:
 
 ```go
 type Request struct {
@@ -262,7 +241,7 @@ For shape-checks beyond the tag language, add a `Validate()` method on the reque
 > [!TIP]
 > **Do not fool around with raw byte slices.**
 > The raw-forward pattern - reading `c.Request.Body` and piping it straight into `svc.CallOnPremise` - is what `svc.ProxyHandler` does and why the template does not wire that route by default (see previous sub-section).
-> For every endpoint you write: unmarshal into a typed struct using the [model binding which Gin provides you](https://gin-gonic.com/en/docs/binding/binding-and-validation/), validate via struct tags (or an explicit `Validate()`), marshal the ABAP-side shape yourself, and - if SAP returns XML - parse it back into Go structs and emit JSON, the way `examples/adtcheckrun/` and `examples/adtdiscovery/` do. `[]byte` and `json.RawMessage` that travel to `svc.CallOnPremise` unchecked are how SAP ends up with Short Dumps and how you end up debugging across three layers at 23:00.
+> For every endpoint you write: unmarshal into a typed struct using the [model binding which Gin provides you](https://gin-gonic.com/en/docs/binding/binding-and-validation/), validate via struct tags (or an explicit `Validate()`), marshal the ABAP-side shape yourself, and - if SAP returns XML - parse it back into Go structs and emit JSON, the way `examples/aireview/` does. `[]byte` and `json.RawMessage` that travel to `svc.CallOnPremise` unchecked are how SAP ends up with Short Dumps and how you end up debugging across three layers at 23:00.
 
 Two things to apply the same discipline to, that are easy to forget:
 
@@ -308,8 +287,8 @@ The **underlying `err`** goes to `slog.ErrorContext` server-side with the status
 > **Two helpers turn the user-facing message into something diagnostic without leaking err details.**
 > Use them instead of a hand-written constant string when calling `svc.CallOnPremise` / `svc.CallOnPremiseMutating`:
 >
-> - **err path** — `kind, detail := btp.ClassifyOnPremError(err)` returns a typed `OnPremFailureKind` (`destination_not_found`, `response_too_large`, `timeout`, `canceled`, `transport_error`) plus a stable, client-safe detail string. Pass `detail` as the user message; log `kind` server-side so operators can filter / aggregate. See `examples/adtdiscovery/handler.go` for the canonical pattern.
-> - **non-2xx-from-SAP path** — `btp.OnPremNon2xxDetail(resp.StatusCode)` returns `"on-premise system returned HTTP <status>"`. Surfaces the SAP status to the client without leaking the response body. Used by both `examples/adtdiscovery/handler.go` (huma) and `examples/adtcheckrun/handler.go` (gin/`AbortError`).
+> - **err path** — `kind, detail := btp.ClassifyOnPremError(err)` returns a typed `OnPremFailureKind` (`destination_not_found`, `response_too_large`, `timeout`, `canceled`, `transport_error`) plus a stable, client-safe detail string. Pass `detail` as the user message; log `kind` server-side so operators can filter / aggregate. See `examples/aireview/handler.go` for the canonical pattern.
+> - **non-2xx-from-SAP path** — `btp.OnPremNon2xxDetail(resp.StatusCode)` returns `"on-premise system returned HTTP <status>"`. Surfaces the SAP status to the client without leaking the response body. Used by `examples/aireview/handler.go`.
 >
 > The wire format of both helpers is part of the public API surface (see `internal/btp/doc.go`); changes require a CHANGELOG entry. Forks pinning the old constant strings in alert rules need to update.
 
@@ -345,7 +324,7 @@ Two log layers, one rule each:
 | Layer                                                                                        | Fields                                                           | What it is NOT                                                                      |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Access log in `cmd/server/main.go` — one line per request                                    | method, path (no query), status, duration, client IP, request_id | Never user identity, never claim values, never query string.                        |
-| Handler-level `slog.InfoContext` (e.g. `invoicesync` emits the authenticated user for audit) | whatever the business event needs                                | Never a per-stage trace; keep to one line per _business event_, not per middleware. |
+| Handler-level `slog.InfoContext` (e.g. `aireview` emits the authenticated user for audit) | whatever the business event needs                                | Never a per-stage trace; keep to one line per _business event_, not per middleware. |
 
 The split exists because putting `user_name` into the access log looks convenient until you put that user's email into a `?owner=…` query string and leak PII through the side channel. Keep access logs claim-free; put audit-worthy fields where the handler knows the context.
 
@@ -389,7 +368,7 @@ type MyClient interface {
 }
 ```
 
-A complete example with a handler test lives in [`examples/adtcheckrun/`](examples/adtcheckrun/): ADT syntax-check POST, typed request body with validator tags, and a `fakeMutator` test double.
+A complete example with a handler test lives in [`examples/aireview/`](examples/aireview/): ADT transport-request review POST, typed request body with validator tags, and a `fakeMutator` test double.
 
 ---
 
@@ -401,7 +380,7 @@ If you're coming from Java or ABAP, the rules are probably tighter than you're u
 1. **Only two levels matter.** `INFO` is useful operational output. `DEBUG` is useful to a developer chasing a specific problem and is off by default in production. `ERROR` exists only as an output-filter knob (`LOG_LEVEL=error` for low-noise deployments), not as a level you ever _write_ to - errors are returned, not logged (see rule 2).
 2. **Errors are not a log level.** An error is a return value. Handlers return it; only the boundary that cannot return any further (the HTTP response, or `main`) logs it. `btp.AbortError` is that boundary for HTTP responses — it writes the envelope and logs the underlying Go error once, server-side, with the request ID.
 3. **`WARN` doesn't exist in this repo.** If it's serious, handle it as an error. If it isn't, log `INFO`. "Something odd happened but I'm going to continue" is where warnings accumulate that nobody ever acts on - don't write those.
-4. **One access-log line per request.** Already wired in `cmd/server/main.go`'s `requestLog`; don't add "entering handler" / "leaving handler" lines on top. If a handler needs business-event context (e.g. `invoicesync` logs `user + company_code`), emit exactly one line per business event, not per middleware stage.
+4. **One access-log line per request.** Already wired in `cmd/server/main.go`'s `requestLog`; don't add "entering handler" / "leaving handler" lines on top. If a handler needs business-event context (e.g. `aireview` logs the authenticated user and transport request number), emit exactly one line per business event, not per middleware stage.
 
 Enforcement: `.github/workflows/template-guards.yml` greps the tree for `.Warn(` and fails CI on any hit. A new PR that reintroduces warnings is blocked at merge; the error message points back to this section.
 
@@ -425,35 +404,27 @@ This means no frickling with neither easy-to-get-wrong endpoint annotations nor 
 These sit under `/api`, so the JWT middleware applies — the spec describes a JWT-gated API; reading it requires the same auth.
 Forks that want public docs can move the huma mount to the engine root in `cmd/server/main.go`'s `buildRouter`.
 
-A huma-style handler looks like this.
-`examples/adtdiscovery/handler.go` is the canonical example in this repo:
+A huma-style handler looks like this (see `examples/aireview/handler.go` for the full pattern used in this service):
 
 ```go
-type DiscoveryInput struct{}                      // GET, no input
-type DiscoveryOutput struct{ Body Response }      // huma reads `Body` for the JSON payload
+type ReviewStatusInput struct{ ID string `path:"id"` }
+type ReviewStatusOutput struct{ Body StatusResponse }
 
 func Register(api huma.API, svc btp.OnPremCaller) {
     huma.Register(api, huma.Operation{
-        OperationID: "adt-discovery",
+        OperationID: "get-review-status",
         Method:      http.MethodGet,
-        Path:        "/adt-discovery",
-        Summary:     "List ADT workspaces and collections",
+        Path:        "/reviews/{id}/status",
+        Summary:     "Poll the status of an in-progress code review",
     }, Handler(svc))
-}
-
-func Handler(svc btp.OnPremCaller) func(context.Context, *DiscoveryInput) (*DiscoveryOutput, error) {
-    return func(ctx context.Context, _ *DiscoveryInput) (*DiscoveryOutput, error) {
-        // … call svc.CallOnPremise, parse, translate …
-        return &DiscoveryOutput{Body: toResponse(svcDoc)}, nil
-    }
 }
 ```
 
 The OpenAPI operation, request/response schemas, and validation rules are derived from the function signature and the embedded structs' JSON tags.
 Add a field with `validate:"required,oneof=EUR USD GBP"` and the spec carries that constraint automatically.
 
-**Two handler styles ship in this repo today.** `adtdiscovery` is huma-style (above).
-`adtcheckrun` and `invoicesync` stay gin-style (`func(c *gin.Context)`) - they read `jwtClaims` from the gin context map for their audit log, and surfacing that to a `context.Context`-only huma handler needs a small adapter tracked as follow-up.
+**Two handler styles ship in this repo today.** GET endpoints that benefit from OpenAPI coverage use huma-style.
+Mutating POST endpoints (`aireview`) stay gin-style (`func(c *gin.Context)`) - they read `jwtClaims` from the gin context map for their audit log, and surfacing that to a `context.Context`-only huma handler needs a small adapter tracked as follow-up.
 Both can coexist on the same router group; pick one per handler — never mix the two styles in a single endpoint.
 
 | Need                                                                                                                | Pick              | Why                                                                                                                   |
@@ -463,7 +434,7 @@ Both can coexist on the same router group; pick one per handler — never mix th
 | Mutating without claim access                                                                                       | **gin** (default) | Same envelope shape as the rest of the typed-error story; consistent with the two existing mutating examples.         |
 | Tied — could go either way                                                                                          | **gin**           | Matches more existing examples (2 of 3); easier for fork-authors to consistency-check against the canonical patterns. |
 
-> **Error envelope.** Huma renders errors as RFC 7807 problem-details (`{"title":"Bad Gateway","status":502,"detail":"…"}`); the gin-style handlers use `btp.ErrorEnvelope` (`{"error":{"code":"upstream_unreachable","message":"…","request_id":"…"}}`). Aware mismatch: unifying both onto `btp.ErrorEnvelope` requires overriding `huma.NewError` AND propagating `request_id` into `context.Context`, which is the same adapter as the `jwtClaims` follow-up. Until then, clients calling `/api/adt-discovery` see RFC 7807; clients calling `/api/adt-checkrun` see the typed envelope.
+> **Error envelope.** Huma renders errors as RFC 7807 problem-details (`{"title":"Bad Gateway","status":502,"detail":"…"}`); the gin-style handlers use `btp.ErrorEnvelope` (`{"error":{"code":"upstream_unreachable","message":"…","request_id":"…"}}`). Aware mismatch: unifying both onto `btp.ErrorEnvelope` requires overriding `huma.NewError` AND propagating `request_id` into `context.Context`, which is the same adapter as the `jwtClaims` follow-up. Until then, clients calling GET status endpoints see RFC 7807; clients calling `POST /api/reviews` see the typed envelope.
 
 ### Test your handler without touching SAP
 
@@ -488,7 +459,7 @@ Tests substitute a one-method fake that records the request the handler produced
 > Anything else in the package is template-internal and may move without notice.
 > A CI gate blocks PRs that add a dependency on the concrete `Service` type from outside `cmd/server/main.go`.
 
-The canonical test lives next to the example handler: [`examples/invoicesync/handler_test.go`](examples/invoicesync/handler_test.go). Its shape:
+The canonical test lives next to the example handler: [`examples/aireview/handler_test.go`](examples/aireview/handler_test.go). Its shape:
 
 ```go
 type fakeOnPrem struct {
@@ -505,22 +476,22 @@ func (f *fakeOnPrem) CallOnPremise(_ context.Context, dest, method, path string,
     return f.resp, f.err
 }
 
-func Test_Handler_MarshalsRequestIntoABAPShape(t *testing.T) {
+func Test_Handler_RejectsInvalidTransportRequest(t *testing.T) {
     fake := &fakeOnPrem{resp: &http.Response{
         StatusCode: http.StatusOK,
         Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
     }}
     r := newRouter(fake) // see the test file for the gin setup helper
 
-    req := httptest.NewRequest(http.MethodPost, "/invoice-sync",
-        strings.NewReader(`{"company_code":"1000", ...}`))
+    req := httptest.NewRequest(http.MethodPost, "/api/reviews",
+        strings.NewReader(`{"transport_request":""}`))
     req.Header.Set("Content-Type", "application/json")
     w := httptest.NewRecorder()
     r.ServeHTTP(w, req)
 
     // Assert what the handler did with SAP.
     then.AssertThat(t, fake.gotDest,   is.EqualTo("HF_S4"))
-    then.AssertThat(t, fake.gotPath,   is.EqualTo("/sap/bc/rest/zmy_invoice_sync"))
+    then.AssertThat(t, fake.gotPath,   is.EqualTo("/sap/bc/adt/..."))
     // Decode fake.gotBody into your expected ABAP-side struct and assert field by field.
 }
 ```
@@ -561,7 +532,7 @@ If you do hit a wall, [How it works under the hood](#how-it-works-under-the-hood
 
 - **Your Destination uses Principal Propagation, not Basic Auth.** The approuter-forwarded user JWT is stashed in the request context under `btp.ForwardedUserTokenKey{}`; implement a `DestinationAuthenticator` that reads it and sets `SAP-Connectivity-Authentication`. See "Extension points" below.
 - **Your on-prem endpoint needs CSRF tokens for writes** (most ADT writes do). Use `svc.CallOnPremiseMutating` — it runs the `X-CSRF-Token: Fetch` → attach-token-and-cookies → retry-once-on-403 dance transparently. See [Calling SAP with a POST — the CSRF case](#calling-sap-with-a-post--the-csrf-case) below.
-- **One of the demo endpoints (`/api/adt-discovery`, `/api/adt-checkrun`) returns 502 or an unexpected 401.** See the failure-mode ladder under "Smoke tests" below.
+- **`POST /api/reviews` or `GET /api/reviews/:id/status` returns 502 or an unexpected 401.** See the failure-mode ladder under "Smoke tests" below.
 
 ## Deployment
 
@@ -744,7 +715,7 @@ BTP cockpit → subaccount → Connectivity → **Destinations** → New Destina
 
 | Field                                | Value                                                                                                                                        |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Name**                             | `HfSap` (the destination name your handlers hard-code — e.g. `adtdiscovery` and `adtcheckrun` reference `HF_S4` — plus anything a fork adds) |
+| **Name**                             | `HfSap` (the destination name your handlers hard-code — e.g. `aireview` references `HF_S4` — plus anything a fork adds) |
 | **Type**                             | `HTTP`                                                                                                                                       |
 | **URL**                              | virtual host as exposed by the Cloud Connector (e.g. `http://hfsap.cc:8000`)                                                                 |
 | **Proxy Type**                       | `OnPremise`                                                                                                                                  |
@@ -752,7 +723,7 @@ BTP cockpit → subaccount → Connectivity → **Destinations** → New Destina
 | **User / Password**                  | the SAP account on the on-prem system                                                                                                        |
 | **Additional Properties** (optional) | `CloudConnectorLocationId` = `<your location ID>` if you have multiple CCs                                                                   |
 
-Once this exists (and a handler that references it by name is wired in `buildRouter` — `adtdiscovery` / `adtcheckrun` reference `HF_S4`), calls through that handler will work. Until the destination exists, the handler returns a typed `upstream_unreachable` 502 envelope.
+Once this exists (and a handler that references it by name is wired in `buildRouter` — `aireview` references `HF_S4`), calls through that handler will work. Until the destination exists, the handler returns a typed `upstream_unreachable` 502 envelope.
 
 </details>
 
@@ -804,20 +775,19 @@ A `401 invalid token: ... invalid audience` here points at section 7 of this dep
 </details>
 
 <details>
-<summary>6c. <code>/api/adt-discovery</code> — full three-leg call to on-prem SAP</summary>
+<summary>6c. <code>GET /</code> → submit a transport request — full three-leg call to on-prem SAP via Claude agent</summary>
 
-Simplest: open the URL in the same browser you used for 6b — the approuter session cookie is already set, and the browser will render the JSON response. A compact `{"workspaces":[…]}` payload is the success signal.
+Open the approuter root in the browser you used for 6b — the approuter session cookie is already set:
 
-If you want `curl` instead, export the approuter session cookie from your browser (DevTools → Application → Cookies → copy `JSESSIONID`, or use a "cookies.txt" browser extension) and pass it via `-b`:
-
-```sh
-curl -L -b "JSESSIONID=<value-from-devtools>" \
-  https://<approuter-host>.<domain>/api/adt-discovery
+```
+https://<approuter-host>.<domain>/
 ```
 
-Expected: `200 application/json` with a body starting `{"workspaces":[…]}`. That one call exercises the destination-service lookup, both XSUAA `client_credentials` fetches, the Cloud Connector proxy tunnel, and Basic Auth against the on-premise SAP system — in the three-leg sequence described in the architecture diagram at the bottom of this README. Internally, the handler fetches `/sap/bc/adt/discovery` from the destination (returned as XML), parses the ATOM service document, and emits the typed JSON view.
+Enter a transport request number (e.g. `DEVK900123`) and submit. The service posts to `POST /api/reviews`, the Claude agent fetches ABAP objects via ADT through the BTP Connectivity SOCKS5 proxy, and you are redirected to `GET /reviews/:id` once the review is ready.
 
-Why `/sap/bc/adt/discovery` as the probe: it's a standard ABAP Development Tools endpoint (used by [`Hochfrequenz/adtler`](https://github.com/Hochfrequenz/adtler) as the CSRF-preflight target), available on any ADT-enabled S/4 system, and reachable by any authenticated ADT developer user — so it rarely trips on fine-grained authorization. If your destination points at a non-S/4 system (for example a HANA XS-only host), change the hard-coded path in `examples/adtdiscovery/handler.go` to something your destination user has read access to.
+That one request exercises the destination-service lookup, both XSUAA `client_credentials` fetches, the Cloud Connector proxy tunnel, Basic Auth against the on-premise SAP system, and the Claude API tool-use loop — in the three-leg sequence described in the architecture diagram at the top of this README.
+
+Why ADT `/sap/bc/adt/transportrequests/{trkorr}/objects` as the probe: it is a standard ABAP Development Tools endpoint available on any ADT-enabled S/4 system and reachable by any authenticated ADT developer user.
 
 </details>
 
@@ -982,7 +952,7 @@ sequenceDiagram
     participant CC as Cloud<br/>Connector
     participant SAP as On-premise<br/>SAP system
 
-    Browser->>AR: GET /api/adt-discovery (or other typed route)
+    Browser->>AR: POST /api/reviews (or other typed route)
     AR->>XSUAA: OAuth auth-code flow (first time only)
     XSUAA-->>AR: session + JWT
     AR->>Go: forward request with Authorization: Bearer <jwt>
