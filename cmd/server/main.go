@@ -19,12 +19,8 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/adtcheckrun"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/adtdiscovery"
 	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/aireview"
 	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/adtclient"
 	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/agent"
@@ -52,12 +48,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	svc, err := btp.NewService(env, btp.WithUserAgent(buildUserAgent()))
-	if err != nil {
-		logger.Error("btp service init failed", "err", err)
-		os.Exit(1)
-	}
-
 	adtClient, err := adtclient.NewFromBTPEnv(ctx, *env)
 	if err != nil {
 		logger.Error("adtler client init failed", "err", err)
@@ -70,7 +60,7 @@ func main() {
 	runner := agent.NewRunner(agentTools, claudeClient)
 	tmpl := ui.MustLoadTemplates()
 
-	r := buildRouter(validator, svc, svc, logger, store, runner, tmpl, ctx)
+	r := buildRouter(validator, logger, store, runner, tmpl, ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -187,25 +177,19 @@ func logLevelFromEnv() slog.Level {
 	}
 }
 
-// buildRouter wires the Gin router from its abstract dependencies —
-// NOT from *btp.Service directly. Handlers added here are testable
-// with a one-method fake (see examples/*_test.go) and decoupled from
-// any internal btp refactor.
+// buildRouter wires the Gin router from its abstract dependencies.
+// Handlers added here are decoupled from any internal btp refactor.
 //
-// The set of routes below is the *constrained-proxy* pattern: every
-// endpoint has a fixed method, a fixed destination name, and a fixed
-// SAP path baked in at the registration site. That is deliberate —
-// strict typing at the Gin boundary requires a finite endpoint set.
-// A transparent `api.Any("/sap/:destination/*path", …)` route is
-// convenient but untyped by definition, and it turns the service
-// into a tunnel that carries the destination's technical-user
-// authority to any authenticated BTP caller. The template ships
-// without such a route; forks that genuinely need one should wire
+// Routes follow the constrained-proxy pattern: every endpoint has a
+// fixed method, a fixed destination name, and a fixed SAP path baked
+// in at the registration site. A transparent
+// `api.Any("/sap/:destination/*path", …)` route is convenient but
+// untyped by definition, and it turns the service into a tunnel that
+// carries the destination's technical-user authority to any
+// authenticated BTP caller. Forks that genuinely need one should wire
 // `svc.ProxyHandler` themselves, gated behind `btp.RequireScope`.
 func buildRouter(
 	validator *btp.JWTValidator,
-	caller btp.OnPremCaller,
-	mutator btp.OnPremMutator,
 	logger *slog.Logger,
 	store reviewstore.JobStore,
 	runner aireview.ReviewRunner,
@@ -249,41 +233,6 @@ func buildRouter(
 		c.JSON(http.StatusOK, gin.H{"claims": claims})
 	})
 
-	// Mount a huma.API on top of the same Gin group. huma generates a
-	// real OpenAPI 3.1 spec from the handler signatures and serves it +
-	// a Swagger UI for free:
-	//
-	//   GET /api/openapi.json   — the spec (OpenAPI 3.1)
-	//   GET /api/openapi.yaml   — same, YAML
-	//   GET /api/docs           — Swagger UI rendered from the spec
-	//   GET /api/schemas/*      — referenced schemas
-	//
-	// They sit under /api so the JWT middleware applies — the spec
-	// describes a JWT-gated API; reading it requires the same auth.
-	// Forks that want public docs can move the huma mount to the
-	// engine root and drop validator from the operations directly,
-	// but the typical case (HF-internal API) is happier with gated
-	// docs.
-	hapi := humagin.NewWithGroup(r, api,
-		huma.DefaultConfig("Go SAP BTP CF Template", "0.1"))
-
-	// Two constrained-proxy demos. Both are fully typed (JSON in,
-	// JSON out) — SAP's XML is consumed + parsed inside the handler,
-	// never emitted at the client boundary:
-	//   GET  /api/adt-discovery  → huma-style: typed Input/Output,
-	//                               appears in the OpenAPI spec.
-	//   POST /api/adt-checkrun   → gin-style: raw c.ShouldBindJSON,
-	//                               does NOT appear in the OpenAPI
-	//                               spec. Migrating it (and
-	//                               invoicesync) to huma is tracked
-	//                               as follow-up work — they read
-	//                               jwtClaims, which currently lives
-	//                               in the gin context map and needs
-	//                               a small adapter to surface in
-	//                               huma's context.Context.
-	adtdiscovery.Register(hapi, caller)
-	adtcheckrun.Register(api, mutator)
-
 	// UI routes (no JWT — HTML shells; HTMX API calls under /api are JWT-gated)
 	r.GET("/", func(c *gin.Context) {
 		html, err := tmpl.RenderIndex()
@@ -315,11 +264,10 @@ func buildRouter(
 }
 
 // buildUserAgent derives a traceable User-Agent from the compiled binary's
-// module path and version. Passing this through to btp.NewService means
-// SAP-side access logs and oncall traces see "my-service/v1.2.3" rather
-// than the template's literal name — exactly the move each fork should
-// make. debug.ReadBuildInfo can fail for unusual build setups (test
-// binaries, `go run`); the fallback keeps the service bootable.
+// module path and version. SAP-side access logs and oncall traces will see
+// "my-service/v1.2.3" rather than the template's literal name.
+// debug.ReadBuildInfo can fail for unusual build setups (test binaries,
+// `go run`); the fallback keeps the service bootable.
 func buildUserAgent() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if p := info.Main.Path; p != "" && p != "command-line-arguments" {
