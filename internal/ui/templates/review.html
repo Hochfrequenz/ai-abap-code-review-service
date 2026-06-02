@@ -3,10 +3,114 @@
 <head>
   <meta charset="UTF-8">
   <title>Review {{.TRID}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;600&family=Roboto+Condensed:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
-  <style media="print">
-    nav, button { display: none; }
-    body { font-family: serif; max-width: 100%; }
+  <style>
+    :root {
+      --green-dark:   #4fbd57;
+      --green-brand:  #7aab8a;
+      --pink-accent:  #e94c74;
+      --off-white:    #e7e6e5;
+      --soft-black:   #25141d;
+      --gray:         #c4cac1;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto Condensed', sans-serif;
+      background: var(--off-white);
+      color: var(--soft-black);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    nav {
+      max-width: 800px;
+      margin: 0 auto 1.5rem;
+    }
+    nav a {
+      color: var(--green-brand);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    nav a:hover { text-decoration: underline; }
+    #status { max-width: 800px; margin: 0 auto; }
+
+    /* Polling states */
+    #status > div[hx-trigger] {
+      padding: 1rem;
+      background: #fff;
+      border-left: 4px solid var(--green-brand);
+      border-radius: 4px;
+      font-size: 1.05rem;
+    }
+
+    /* Review article */
+    article.review {
+      background: #fff;
+      border-radius: 6px;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    article.review h1 {
+      font-family: 'Yanone Kaffeesatz', sans-serif;
+      font-size: 2rem;
+      color: var(--green-brand);
+      margin-bottom: 1rem;
+    }
+    article.review h2 {
+      font-family: 'Yanone Kaffeesatz', sans-serif;
+      font-size: 1.5rem;
+      color: var(--soft-black);
+      margin: 1.5rem 0 0.5rem;
+      border-bottom: 1px solid var(--gray);
+      padding-bottom: 0.25rem;
+    }
+    article.review h3 {
+      font-family: 'Yanone Kaffeesatz', sans-serif;
+      font-size: 1.2rem;
+      margin: 1rem 0 0.3rem;
+    }
+    article.review p  { margin-bottom: 0.75rem; }
+    article.review ul, article.review ol { margin: 0.5rem 0 0.75rem 1.5rem; }
+    article.review li { margin-bottom: 0.25rem; }
+    article.review strong { color: var(--soft-black); }
+    article.review code {
+      background: var(--off-white);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+
+    /* Print button */
+    button.print-btn {
+      display: inline-block;
+      margin-top: 1.25rem;
+      padding: 0.55rem 1.2rem;
+      background: var(--green-dark);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-family: 'Yanone Kaffeesatz', sans-serif;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+    button.print-btn:hover { background: var(--green-brand); }
+
+    /* Error state */
+    .error {
+      padding: 1rem;
+      background: #fde8ed;
+      border-left: 4px solid var(--pink-accent);
+      border-radius: 4px;
+      color: #8b1a35;
+    }
+
+    @media print {
+      nav, button { display: none; }
+      body { background: #fff; padding: 0; }
+      article.review { box-shadow: none; border-radius: 0; padding: 0; }
+    }
   </style>
 </head>
 <body>

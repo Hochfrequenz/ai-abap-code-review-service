@@ -1,6 +1,6 @@
 {{- if eq .Status "done" -}}
 <article class="review">{{.ReviewHTML | safeHTML}}</article>
-<button onclick="window.print()">Print / Save as PDF</button>
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
 {{- else if eq .Status "failed" -}}
 <div class="error">Review failed: {{.ErrMsg}}</div>
 {{- else if eq .Status "running" -}}
