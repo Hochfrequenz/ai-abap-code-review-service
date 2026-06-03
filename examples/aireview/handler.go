@@ -119,6 +119,7 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			return
 		}
 		// "D" = modifiable (open) requests only; "L" = released.
+		// Empty user string returns all users' open TRs — intentional for a review tool.
 		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
 			// Best-effort: a broken ADT connection must not break the form.
@@ -129,7 +130,7 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
 		var b strings.Builder
 		for _, tr := range trs {
-			fmt.Fprintf(&b, "<option value=%q>%s — %s (%s)</option>\n",
+			fmt.Fprintf(&b, "<option value=\"%s\">%s — %s (%s)</option>\n",
 				html.EscapeString(tr.Number),
 				html.EscapeString(tr.Number),
 				html.EscapeString(tr.Description),

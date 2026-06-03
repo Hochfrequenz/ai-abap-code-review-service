@@ -243,11 +243,36 @@ func TestGetTransportRequests_ReturnsSortedOptions(t *testing.T) {
 	if pos14 < 0 || pos07 < 0 || pos01 < 0 {
 		t.Fatalf("missing TR numbers in response: %s", body)
 	}
-	if !(pos14 < pos07 && pos07 < pos01) {
+	if pos14 >= pos07 || pos07 >= pos01 {
 		t.Errorf("TRs not in descending order: pos14=%d pos07=%d pos01=%d", pos14, pos07, pos01)
 	}
 	if !strings.Contains(body, "New TR") || !strings.Contains(body, "USER2") {
 		t.Errorf("description/owner missing: %s", body)
+	}
+}
+
+func TestGetTransportRequests_HTMLEscapesSpecialChars(t *testing.T) {
+	lister := &fakeTransportRequestLister{
+		requests: []adt.TransportRequest{
+			{Number: "NPLK900014", Description: `TR & <fix> "bug"`, Owner: `U<S>ER`},
+		},
+	}
+	store := newFakeStore("00000000-0000-0000-0000-000000000013")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouterWithLister(store, &fakeRunner{}, lister, tmpl)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/transport-requests", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	// Raw special chars must never appear unescaped in the HTML.
+	if strings.Contains(body, "<fix>") || strings.Contains(body, `"bug"`) || strings.Contains(body, "<S>") {
+		t.Errorf("unescaped HTML in response: %s", body)
+	}
+	// Escaped forms must be present.
+	if !strings.Contains(body, "&amp;") || !strings.Contains(body, "&lt;fix&gt;") {
+		t.Errorf("expected HTML-escaped content in response: %s", body)
 	}
 }
 
