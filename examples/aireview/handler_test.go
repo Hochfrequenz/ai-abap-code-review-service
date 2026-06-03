@@ -20,9 +20,10 @@ import (
 )
 
 type fakeStore struct {
-	job    *reviewstore.Job
-	doneCh chan string
-	getErr error
+	job      *reviewstore.Job
+	doneCh   chan string
+	failedCh chan string
+	getErr   error
 }
 
 func newFakeStore(jobID string) *fakeStore {
@@ -33,7 +34,8 @@ func newFakeStore(jobID string) *fakeStore {
 			Status:    reviewstore.JobStatusPending,
 			CreatedAt: time.Now(),
 		},
-		doneCh: make(chan string, 1),
+		doneCh:   make(chan string, 1),
+		failedCh: make(chan string, 1),
 	}
 }
 
@@ -54,6 +56,7 @@ func (f *fakeStore) MarkDone(_ context.Context, _ string, md string) error {
 func (f *fakeStore) MarkFailed(_ context.Context, _ string, errMsg string) error {
 	f.job.Status = reviewstore.JobStatusFailed
 	f.job.ErrMsg = errMsg
+	f.failedCh <- errMsg
 	return nil
 }
 
@@ -207,7 +210,6 @@ func TestPost_GoroutineCallsMarkDone(t *testing.T) {
 
 func TestPost_PreflightFails_JobMarkedFailed(t *testing.T) {
 	store := newFakeStore("00000000-0000-0000-0000-000000000020")
-	store.job.Status = reviewstore.JobStatusPending
 	tmpl := ui.MustLoadTemplates()
 	runner := &fakeRunner{preflightErr: errors.New("keine prüfbaren Objekte")}
 	r := newRouter(store, runner, tmpl)
@@ -221,21 +223,13 @@ func TestPost_PreflightFails_JobMarkedFailed(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("POST must return 200 (job created), got %d", w.Code)
 	}
-	// Wait for goroutine to call MarkFailed
-	deadline := time.After(5 * time.Second)
-	for {
-		select {
-		case <-deadline:
-			t.Fatalf("timeout: job status is %q, expected failed", store.job.Status)
-		default:
+	select {
+	case msg := <-store.failedCh:
+		if msg == "" {
+			t.Error("MarkFailed must be called with a non-empty error message")
 		}
-		if store.job.Status == reviewstore.JobStatusFailed {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if store.job.ErrMsg == "" {
-		t.Error("MarkFailed must be called with a non-empty error message")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for MarkFailed to be called")
 	}
 }
 

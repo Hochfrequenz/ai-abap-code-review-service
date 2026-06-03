@@ -72,7 +72,7 @@ func NewRunner(tools *Tools, client anthropic.Client) *Runner {
 func (r *Runner) Preflight(ctx context.Context, trID string) error {
 	objs, err := r.tools.ListTRObjects(ctx, trID)
 	if err != nil {
-		return fmt.Errorf("ADT-Verbindung fehlgeschlagen: %w", err)
+		return fmt.Errorf("ADT nicht erreichbar — bitte SAP-Verbindung und Cloud-Connector prüfen")
 	}
 	if len(objs) == 0 {
 		return fmt.Errorf("Transportauftrag %q nicht gefunden oder enthält keine Objekte", trID)
