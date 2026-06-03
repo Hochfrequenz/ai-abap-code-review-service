@@ -8,10 +8,21 @@ import (
 )
 
 // ADTClient is the subset of adt.Client the agent tools need.
+// Implementing this interface is also the swap point for replacing adtler with
+// a different SAP ADT client if needed.
 type ADTClient interface {
+	// Source reading
 	GetTransportObjects(ctx context.Context, transportNumber string) ([]adt.TransportObject, error)
 	GetSource(ctx context.Context, objectURI string) (*adt.SourceResult, error)
 	GetIncludeSource(ctx context.Context, objectURI, include string) (*adt.SourceResult, error)
+	// Quality & analysis
+	SyntaxCheck(ctx context.Context, objectURI string) ([]adt.SyntaxMessage, error)
+	RunATCCheck(ctx context.Context, objectURIs []string, checkVariant string) (*adt.ATCResult, error)
+	// Navigation & metadata
+	GetObjectInfo(ctx context.Context, objectURI string) (*adt.ObjectInfo, error)
+	GetVersionHistory(ctx context.Context, objectURI string) ([]adt.VersionInfo, error)
+	WhereUsed(ctx context.Context, objectURI string) ([]adt.ObjectInfo, error)
+	DiffActiveInactive(ctx context.Context, objectURI string) (*adt.DiffResult, error)
 }
 
 // TRObject is the agent-facing view of a transport request object.
@@ -64,6 +75,64 @@ func (t *Tools) FetchSource(ctx context.Context, objectURI string) (string, erro
 		return "", fmt.Errorf("fetch source %q: %w", objectURI, err)
 	}
 	return res.Source, nil
+}
+
+// SyntaxCheck runs an ADT syntax check on the saved object at objectURI.
+// Returns syntax messages (errors, warnings, info). An empty slice means no issues.
+func (t *Tools) SyntaxCheck(ctx context.Context, objectURI string) ([]adt.SyntaxMessage, error) {
+	msgs, err := t.client.SyntaxCheck(ctx, objectURI)
+	if err != nil {
+		return nil, fmt.Errorf("syntax check %q: %w", objectURI, err)
+	}
+	return msgs, nil
+}
+
+// GetObjectInfo returns metadata for an ABAP object: type, name, description, package.
+func (t *Tools) GetObjectInfo(ctx context.Context, objectURI string) (*adt.ObjectInfo, error) {
+	info, err := t.client.GetObjectInfo(ctx, objectURI)
+	if err != nil {
+		return nil, fmt.Errorf("get object info %q: %w", objectURI, err)
+	}
+	return info, nil
+}
+
+// GetVersionHistory returns the version history of an ABAP object (author, date, transport per version).
+func (t *Tools) GetVersionHistory(ctx context.Context, objectURI string) ([]adt.VersionInfo, error) {
+	hist, err := t.client.GetVersionHistory(ctx, objectURI)
+	if err != nil {
+		return nil, fmt.Errorf("get version history %q: %w", objectURI, err)
+	}
+	return hist, nil
+}
+
+// WhereUsed returns objects that reference the given ABAP object (callers, users).
+func (t *Tools) WhereUsed(ctx context.Context, objectURI string) ([]adt.ObjectInfo, error) {
+	callers, err := t.client.WhereUsed(ctx, objectURI)
+	if err != nil {
+		return nil, fmt.Errorf("where used %q: %w", objectURI, err)
+	}
+	return callers, nil
+}
+
+// DiffActiveInactive returns the diff between the active (released) and inactive (pending) version.
+// HasChanges=false means the object has no pending edits.
+func (t *Tools) DiffActiveInactive(ctx context.Context, objectURI string) (*adt.DiffResult, error) {
+	diff, err := t.client.DiffActiveInactive(ctx, objectURI)
+	if err != nil {
+		return nil, fmt.Errorf("diff active/inactive %q: %w", objectURI, err)
+	}
+	return diff, nil
+}
+
+// RunATCCheck runs the ATC (ABAP Test Cockpit) static analysis on the given object URIs.
+// checkVariant is the ATC check variant name; pass "" to use the system default.
+// Returns findings with priority, check name, and message for each issue.
+func (t *Tools) RunATCCheck(ctx context.Context, objectURIs []string, checkVariant string) (*adt.ATCResult, error) {
+	result, err := t.client.RunATCCheck(ctx, objectURIs, checkVariant)
+	if err != nil {
+		return nil, fmt.Errorf("run ATC check: %w", err)
+	}
+	return result, nil
 }
 
 // FetchClassIncludes returns a map of include name → source for a CLAS URI.
