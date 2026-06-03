@@ -28,12 +28,14 @@ func NewSQLTransportLister(client adt.Client, lang string) *SQLTransportLister {
 
 // GetTransportRequests queries E070 for open TRs, then enriches with E07T descriptions.
 func (s *SQLTransportLister) GetTransportRequests(ctx context.Context, user, status string) ([]adt.TransportRequest, error) {
-	// Build E070 query — modifiable TRs sorted by date descending.
-	where := "TRSTATUS = 'D'"
+	// Build E070 query — modifiable TRs, excluding SAP-owned standard packages.
+	// SAP-owned TRs (AS4USER='SAP') are standard package transports, not customer
+	// development — they clog the list and are never useful for code review.
+	where := "TRSTATUS = 'D' AND AS4USER <> 'SAP'"
 	if status == "L" {
-		where = "TRSTATUS = 'L'"
+		where = "TRSTATUS = 'L' AND AS4USER <> 'SAP'"
 	} else if status != "" && status != "D" {
-		where = fmt.Sprintf("TRSTATUS = '%s'", status)
+		where = fmt.Sprintf("TRSTATUS = '%s' AND AS4USER <> 'SAP'", status)
 	}
 	if user != "" {
 		where += fmt.Sprintf(" AND AS4USER = '%s'", user)
