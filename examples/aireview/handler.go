@@ -24,6 +24,9 @@ import (
 // model must be a non-empty key from agent.AllowedModels(); promptKey must be a non-empty
 // key from agent.AllowedPrompts(). Empty string is rejected with 400.
 type ReviewRunner interface {
+	// Preflight checks the transport request before any AI tokens are spent.
+	// Returns a German user-facing error if the TR is unreachable or has no reviewable objects.
+	Preflight(ctx context.Context, trID string) error
 	Run(ctx context.Context, trID, model, promptKey string) (string, error)
 }
 
@@ -92,6 +95,10 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 		// Use context.WithoutCancel so the goroutine outlives the HTTP response.
 		go func(ctx context.Context, jobID, trID, model, promptKey string) {
 			_ = store.MarkRunning(ctx, jobID)
+			if err := runner.Preflight(ctx, trID); err != nil {
+				_ = store.MarkFailed(ctx, jobID, err.Error())
+				return
+			}
 			md, runErr := runner.Run(ctx, trID, model, promptKey)
 			if runErr != nil {
 				_ = store.MarkFailed(ctx, jobID, runErr.Error())
