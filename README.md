@@ -64,6 +64,16 @@ For integration tests against a real SAP system see [issue #6](../../issues/6) â
 
 ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP system using the destination configured in `config.yml`.
 
+## Deployed instance (Hochfrequenz)
+
+| | URL |
+|---|---|
+| **Web UI** (XSUAA login required) | https://ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com/ |
+| Health | https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/healthz |
+| Version | https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version |
+
+CI/CD: pushes to `main` are deployed automatically via `.github/workflows/deploy.yml` to the `dev` space in the `HF Dev Account_hf-cf` org on `eu10`.
+
 ## Customisation
 
 | What | Where |
