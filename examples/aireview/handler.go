@@ -3,8 +3,11 @@ package aireview
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"sort"
 
+	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
 
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
@@ -20,6 +23,12 @@ type ReviewRunner interface {
 	Run(ctx context.Context, trID string) (string, error)
 }
 
+// TransportRequestLister retrieves open CTS transport requests from SAP ADT.
+// Satisfied by adtler.Client in production; use a one-method fake in tests.
+type TransportRequestLister interface {
+	GetTransportRequests(ctx context.Context, user, status string) ([]adt.TransportRequest, error)
+}
+
 type reviewRequest struct {
 	// TransportRequestID is a SAP CTS transport request number.
 	// Format: 2-letter system prefix + K + 6 digits, all uppercase — e.g. NPLK900014.
@@ -30,12 +39,13 @@ type reviewRequest struct {
 
 const contentTypeHTML = "text/html; charset=utf-8"
 
-// Register attaches the two aireview routes to the JWT-guarded api group.
+// Register attaches the aireview routes to the JWT-guarded api group.
 // rootCtx must be the server's root context (not a request context) so the
 // goroutine continues after the HTTP response is written.
-func Register(api *gin.RouterGroup, rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, tmpl ui.Templates) {
+func Register(api *gin.RouterGroup, rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, lister TransportRequestLister, tmpl ui.Templates) {
 	api.POST("/reviews", postReview(rootCtx, store, runner, tmpl))
 	api.GET("/reviews/:id/status", getStatus(store, tmpl))
+	api.GET("/transport-requests", getTransportRequests(lister))
 }
 
 func postReview(rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, _ ui.Templates) gin.HandlerFunc {
@@ -94,5 +104,46 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 			return
 		}
 		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
+	}
+}
+
+// openTR is the JSON representation of a transport request sent to the browser.
+// The browser-side JS filters these client-side by number, owner, and description.
+type openTR struct {
+	Number      string `json:"number"`
+	Owner       string `json:"owner"`
+	Description string `json:"description"`
+}
+
+// getTransportRequests returns all open (modifiable) transport requests as a JSON
+// array, sorted by number descending (newest first). The browser fetches this once
+// on page load and filters client-side — no round-trips needed while the user types.
+// On ADT error it returns an empty JSON array so the form stays usable.
+func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if lister == nil {
+			c.JSON(http.StatusOK, []openTR{})
+			return
+		}
+		// Empty user = all users' open TRs ("D" = modifiable/open only).
+		// Implementation uses RunQuery on E070/E07T instead of the ADT transport
+		// organizer tree endpoint: the HF S/4 system uses KORRDEV="SYST"/"CUST"
+		// for its requests, which the organizer tree ignores (it only handles "K").
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
+		if err != nil {
+			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
+			c.JSON(http.StatusOK, []openTR{})
+			return
+		}
+		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
+		result := make([]openTR, 0, len(trs))
+		for _, tr := range trs {
+			result = append(result, openTR{
+				Number:      tr.Number,
+				Owner:       tr.Owner,
+				Description: tr.Description,
+			})
+		}
+		c.JSON(http.StatusOK, result)
 	}
 }

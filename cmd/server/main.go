@@ -55,6 +55,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Use SQL-based TR lister — the ADT transport organizer tree endpoint only returns
+	// standard K-type requests and misses SYST/CUST types used in S/4HANA.
+	// RunQuery on E070/E07T works for all request types.
+	sqlLister := adtclient.NewSQLTransportLister(adtClient, "D")
+
 	store := reviewstore.NewMemoryStore()
 	agentTools := agent.NewTools(adtClient)
 	// anthropic.NewClient reads ANTHROPIC_API_KEY from env — this is the
@@ -69,7 +74,7 @@ func main() {
 	runner := agent.NewRunner(agentTools, claudeClient)
 	tmpl := ui.MustLoadTemplates()
 
-	r := buildRouter(validator, logger, store, runner, tmpl, ctx)
+	r := buildRouter(validator, logger, store, runner, sqlLister, tmpl, ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -198,6 +203,7 @@ func buildRouter(
 	logger *slog.Logger,
 	store reviewstore.JobStore,
 	runner aireview.ReviewRunner,
+	lister aireview.TransportRequestLister,
 	tmpl ui.Templates,
 	rootCtx context.Context,
 ) *gin.Engine {
@@ -265,7 +271,7 @@ func buildRouter(
 	})
 
 	// HTMX API routes (JWT-gated via the api group)
-	aireview.Register(api, rootCtx, store, runner, tmpl)
+	aireview.Register(api, rootCtx, store, runner, lister, tmpl)
 
 	return r
 }
