@@ -118,11 +118,9 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// Debug rc7: hardcode user "kleink" — confirmed to have open TRs on HF_S4.
-		// Remove once we confirm ADT returns data.
-		debugUser := "kleink"
-		slog.InfoContext(c.Request.Context(), "transport-requests calling ADT", "user", debugUser)
-		trs, err := lister.GetTransportRequests(c.Request.Context(), debugUser, "D")
+		// Debug rc8: try no status filter to see if adtler returns anything.
+		slog.InfoContext(c.Request.Context(), "transport-requests calling ADT", "user", "kleink", "status", "")
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "kleink", "")
 		slog.InfoContext(c.Request.Context(), "transport-requests ADT returned", "count", len(trs), "err", err)
 		if err != nil {
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
