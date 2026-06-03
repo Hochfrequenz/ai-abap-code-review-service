@@ -226,9 +226,7 @@ func buildRouter(
 		requestLog(logger),
 	)
 
-	r.GET("/healthz", func(c *gin.Context) {
-		c.String(http.StatusOK, "ok")
-	})
+	r.GET("/healthz", healthzHandler([]string{"ANTHROPIC_API_KEY"}))
 	r.GET("/version", versionHandler())
 
 	api := r.Group("/api")
@@ -335,6 +333,28 @@ func securityHeaders() gin.HandlerFunc {
 			h.Set("Cache-Control", "no-store")
 		}
 		c.Next()
+	}
+}
+
+// healthzHandler returns 200 "ok" when all required env vars are non-empty,
+// or 503 with a JSON body listing the missing vars otherwise. This ensures
+// that a misconfigured deployment (e.g. missing ANTHROPIC_API_KEY) is
+// immediately visible to health checks rather than silently failing on the
+// first real request.
+func healthzHandler(requiredEnvVars []string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var missing []string
+		for _, key := range requiredEnvVars {
+			if os.Getenv(key) == "" {
+				missing = append(missing, key)
+			}
+		}
+		if len(missing) > 0 {
+			btp.AbortError(c, http.StatusServiceUnavailable, btp.CodeInternal,
+				"server misconfigured: missing required environment variables: "+strings.Join(missing, ", "), nil)
+			return
+		}
+		c.String(http.StatusOK, "ok")
 	}
 }
 
