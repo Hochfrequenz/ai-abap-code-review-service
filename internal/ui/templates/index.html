@@ -80,12 +80,15 @@
         hx-target="#result"
         hx-swap="innerHTML">
     <label for="tr">Transportauftragsnummer</label>
-    <input id="tr" name="transport_request_id" list="tr-list" placeholder="NPLK900014" required>
-    <datalist id="tr-list"
-              hx-get="/api/transport-requests"
-              hx-trigger="load"
-              hx-swap="innerHTML">
-    </datalist>
+    <input id="tr" name="transport_request_id"
+           list="tr-list"
+           placeholder="NPLK900014"
+           required
+           hx-get="/api/transport-requests"
+           hx-trigger="load"
+           hx-target="#tr-list"
+           hx-swap="innerHTML">
+    <datalist id="tr-list"></datalist>
     <button type="submit">Review anfordern</button>
   </form>
   <div id="result"></div>
