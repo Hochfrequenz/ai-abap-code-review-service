@@ -9,9 +9,6 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
-// defaultReviewModel is the model used when none is specified by the caller.
-const defaultReviewModel = anthropic.ModelClaudeOpus4_8
-
 // AllowedModels returns the set of model IDs the service accepts, mapped to
 // a human-readable German label shown in the UI.
 func AllowedModels() map[string]string {
