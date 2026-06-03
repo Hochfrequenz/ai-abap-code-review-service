@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -56,8 +57,11 @@ func (f *fakeStore) MarkFailed(_ context.Context, _ string, errMsg string) error
 	return nil
 }
 
-type fakeRunner struct{}
+type fakeRunner struct {
+	preflightErr error
+}
 
+func (f *fakeRunner) Preflight(_ context.Context, _ string) error { return f.preflightErr }
 func (f *fakeRunner) Run(_ context.Context, _, _, _ string) (string, error) {
 	return "# Review\n\nAll good.", nil
 }
@@ -198,6 +202,40 @@ func TestPost_GoroutineCallsMarkDone(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for MarkDone to be called")
+	}
+}
+
+func TestPost_PreflightFails_JobMarkedFailed(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000020")
+	store.job.Status = reviewstore.JobStatusPending
+	tmpl := ui.MustLoadTemplates()
+	runner := &fakeRunner{preflightErr: errors.New("keine prüfbaren Objekte")}
+	r := newRouter(store, runner, tmpl)
+
+	body, _ := json.Marshal(map[string]string{"transport_request_id": "NPLK000001", "model": "claude-opus-4-8", "prompt": "review_pedantic"})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST must return 200 (job created), got %d", w.Code)
+	}
+	// Wait for goroutine to call MarkFailed
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatalf("timeout: job status is %q, expected failed", store.job.Status)
+		default:
+		}
+		if store.job.Status == reviewstore.JobStatusFailed {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if store.job.ErrMsg == "" {
+		t.Error("MarkFailed must be called with a non-empty error message")
 	}
 }
 

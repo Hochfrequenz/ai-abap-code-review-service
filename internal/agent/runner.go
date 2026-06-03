@@ -66,6 +66,25 @@ func NewRunner(tools *Tools, client anthropic.Client) *Runner {
 	return &Runner{tools: tools, client: client}
 }
 
+// Preflight checks that trID refers to a transport with at least one reviewable
+// object (non-empty ADT URI) before any AI tokens are spent.
+// Returns a German user-facing error if the check fails.
+func (r *Runner) Preflight(ctx context.Context, trID string) error {
+	objs, err := r.tools.ListTRObjects(ctx, trID)
+	if err != nil {
+		return fmt.Errorf("ADT-Verbindung fehlgeschlagen: %w", err)
+	}
+	if len(objs) == 0 {
+		return fmt.Errorf("Transportauftrag %q nicht gefunden oder enthält keine Objekte", trID)
+	}
+	for _, obj := range objs {
+		if obj.URI != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("Transportauftrag %q enthält keine prüfbaren Quellobjekte (PROG, CLAS, INTF) — nur Customizing- oder Dictionary-Objekte ohne Quellcode", trID)
+}
+
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
 // and source code, then returns the final markdown review text.
 // model must be a non-empty key from AllowedModels(); promptKey must be a non-empty
