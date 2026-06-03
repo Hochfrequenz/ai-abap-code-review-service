@@ -128,6 +128,8 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 				sapUser, _ = m["user_name"].(string)
 			}
 		}
+		// Temporary debug log — remove after confirming the correct user_name format.
+		slog.InfoContext(c.Request.Context(), "transport-requests user filter", "user", sapUser)
 		// "D" = modifiable (open) requests only; "L" = released.
 		trs, err := lister.GetTransportRequests(c.Request.Context(), sapUser, "D")
 		if err != nil {
