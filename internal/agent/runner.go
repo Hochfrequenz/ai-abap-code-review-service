@@ -9,10 +9,15 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
-// reviewModel is the Claude model used for ABAP code reviews.
-// Change directly in this file if you want a different model.
-// Options: anthropic.ModelClaudeOpus4_8 (best quality), anthropic.ModelClaudeSonnet4_5 (faster/cheaper).
-const reviewModel = anthropic.ModelClaudeOpus4_8
+// AllowedModels returns the set of model IDs the service accepts, mapped to
+// a human-readable German label shown in the UI.
+func AllowedModels() map[string]string {
+	return map[string]string{
+		string(anthropic.ModelClaudeOpus4_8):           "Opus 4.8 (beste Qualität)",
+		string(anthropic.ModelClaudeSonnet4_6):         "Sonnet 4.6 (schneller, günstiger)",
+		string(anthropic.ModelClaudeHaiku4_5_20251001): "Haiku 4.5 (am schnellsten &amp; günstigsten)",
+	}
+}
 
 // reviewMaxTokens is the maximum output token budget for the review.
 // Increase if large transports produce truncated reviews.
@@ -42,7 +47,9 @@ func NewRunner(tools *Tools, client anthropic.Client) *Runner {
 
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
 // and source code, then returns the final markdown review text.
-func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
+// model must be a non-empty key from AllowedModels() — callers are responsible
+// for validation; Run does not default or substitute silently.
+func (r *Runner) Run(ctx context.Context, trID, model string) (string, error) {
 	messages := []anthropic.MessageParam{
 		anthropic.NewUserMessage(anthropic.NewTextBlock(
 			fmt.Sprintf("Please review transport request: %s", trID),
@@ -53,7 +60,7 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 
 	for range reviewMaxToolLoops {
 		resp, err := r.client.Messages.New(ctx, anthropic.MessageNewParams{
-			Model:     reviewModel,
+			Model:     anthropic.Model(model),
 			MaxTokens: reviewMaxTokens,
 			System: []anthropic.TextBlockParam{
 				{

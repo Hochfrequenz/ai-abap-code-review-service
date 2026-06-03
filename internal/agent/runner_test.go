@@ -13,6 +13,51 @@ import (
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
 )
 
+func TestAllowedModels_ContainsOpusSonnetHaiku(t *testing.T) {
+	models := agent.AllowedModels()
+	if _, ok := models[string(anthropic.ModelClaudeOpus4_8)]; !ok {
+		t.Error("AllowedModels must contain Opus 4.8")
+	}
+	if _, ok := models[string(anthropic.ModelClaudeSonnet4_6)]; !ok {
+		t.Error("AllowedModels must contain Sonnet 4.6")
+	}
+	if len(models) < 2 {
+		t.Errorf("expected at least 2 models, got %d", len(models))
+	}
+}
+
+func TestRunner_UsesSpecifiedModel(t *testing.T) {
+	var capturedModel string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if m, ok := body["model"].(string); ok {
+			capturedModel = m
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": body["model"], "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if capturedModel != string(anthropic.ModelClaudeSonnet4_6) {
+		t.Errorf("expected model %q, got %q", anthropic.ModelClaudeSonnet4_6, capturedModel)
+	}
+}
+
 func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	var calls []string
 	callCount := 0
@@ -70,7 +115,7 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	)
 
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014")
+	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -148,7 +193,7 @@ func TestRunner_DispatchTools(t *testing.T) {
 			tools := agent.NewTools(fake)
 			claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 			runner := agent.NewRunner(tools, claudeClient)
-			result, err := runner.Run(context.Background(), "NPLK900014")
+			result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
@@ -176,7 +221,7 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014")
+	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 	if err != nil {
 		t.Fatalf("expected partial result not error, got: %v", err)
 	}
@@ -202,7 +247,7 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	_, err := runner.Run(context.Background(), "NPLK900014")
+	_, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 	if err == nil {
 		t.Error("expected error for unexpected stop reason")
 	}
