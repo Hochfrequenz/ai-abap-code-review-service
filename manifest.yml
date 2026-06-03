@@ -1,6 +1,6 @@
 ---
 # cf push -f manifest.yml --vars-file vars.yml
-# (or) cf push --var domain=cfapps.eu10.hana.ondemand.com --var backend-host=go-btp-mwe
+# (or) cf push --var domain=cfapps.eu10.hana.ondemand.com --var backend-host=ai-abap-code-review-service
 #
 # The approuter needs the backend's public URL baked into its `destinations`
 # env var. CF manifest vars keep us from hard-coding the region/account.

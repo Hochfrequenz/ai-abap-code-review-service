@@ -1,14 +1,14 @@
 {
   "xsappname": "ai-abap-code-review-service",
   "tenant-mode": "dedicated",
-  "description": "Security config for the Go BTP Cloud Foundry MWE",
+  "description": "Security config for the AI ABAP Code Review Service",
   "scopes": [
     { "name": "$XSAPPNAME.User", "description": "Regular authenticated user" }
   ],
   "role-templates": [
     {
       "name": "User",
-      "description": "Authenticated user of the Go BTP MWE",
+      "description": "Authenticated user of the AI ABAP Code Review Service",
       "scope-references": [ "$XSAPPNAME.User" ]
     }
   ],
