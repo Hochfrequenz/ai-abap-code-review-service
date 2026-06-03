@@ -3,11 +3,9 @@ package aireview
 import (
 	"context"
 	"fmt"
-	"html"
 	"log/slog"
 	"net/http"
 	"sort"
-	"strings"
 
 	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
@@ -109,13 +107,22 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 	}
 }
 
-// getTransportRequests returns open (modifiable) transport requests as HTML
-// <option> elements for a <datalist>, sorted by number descending (most recent first).
-// On ADT error it returns an empty 200 so the form stays usable.
+// openTR is the JSON representation of a transport request sent to the browser.
+// The browser-side JS filters these client-side by number, owner, and description.
+type openTR struct {
+	Number      string `json:"number"`
+	Owner       string `json:"owner"`
+	Description string `json:"description"`
+}
+
+// getTransportRequests returns all open (modifiable) transport requests as a JSON
+// array, sorted by number descending (newest first). The browser fetches this once
+// on page load and filters client-side — no round-trips needed while the user types.
+// On ADT error it returns an empty JSON array so the form stays usable.
 func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if lister == nil {
-			c.Data(http.StatusOK, contentTypeHTML, nil)
+			c.JSON(http.StatusOK, []openTR{})
 			return
 		}
 		// Empty user = all users' open TRs ("D" = modifiable/open only).
@@ -125,18 +132,18 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
-			c.Data(http.StatusOK, contentTypeHTML, nil)
+			c.JSON(http.StatusOK, []openTR{})
 			return
 		}
 		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
-		var b strings.Builder
+		result := make([]openTR, 0, len(trs))
 		for _, tr := range trs {
-			fmt.Fprintf(&b, "<option value=\"%s\">%s — %s (%s)</option>\n",
-				html.EscapeString(tr.Number),
-				html.EscapeString(tr.Number),
-				html.EscapeString(tr.Description),
-				html.EscapeString(tr.Owner))
+			result = append(result, openTR{
+				Number:      tr.Number,
+				Owner:       tr.Owner,
+				Description: tr.Description,
+			})
 		}
-		c.Data(http.StatusOK, contentTypeHTML, []byte(b.String()))
+		c.JSON(http.StatusOK, result)
 	}
 }

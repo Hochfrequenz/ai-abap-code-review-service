@@ -80,17 +80,68 @@
         hx-target="#result"
         hx-swap="innerHTML">
     <label for="tr">Transportauftragsnummer</label>
-    <input id="tr" name="transport_request_id"
-           list="tr-list"
-           placeholder="NPLK900014"
-           required
-           hx-get="/api/transport-requests"
-           hx-trigger="load"
-           hx-target="#tr-list"
-           hx-swap="innerHTML">
-    <datalist id="tr-list"></datalist>
+    <div style="position:relative">
+      <input id="tr" name="transport_request_id"
+             placeholder="NPLK900014" required
+             autocomplete="off">
+      <ul id="tr-suggestions" style="
+        display:none; position:absolute; left:0; right:0; top:100%;
+        background:#fff; border:1px solid var(--gray); border-radius:4px;
+        max-height:220px; overflow-y:auto; margin:0; padding:0;
+        list-style:none; z-index:10; box-shadow:0 4px 8px rgba(0,0,0,.1);
+      "></ul>
+    </div>
     <button type="submit">Review anfordern</button>
   </form>
   <div id="result"></div>
+  <script>
+    // Load all open TRs once in the background; filter client-side as the user types.
+    // Filtering is case-insensitive and matches TR number, owner, or description.
+    let allTRs = [];
+    fetch('/api/transport-requests')
+      .then(r => r.json())
+      .then(data => { allTRs = data; })
+      .catch(() => {});  // best-effort; form works without suggestions
+
+    const input = document.getElementById('tr');
+    const list  = document.getElementById('tr-suggestions');
+
+    function showSuggestions(q) {
+      if (!q || !allTRs.length) { list.style.display = 'none'; return; }
+      const ql = q.toLowerCase();
+      const hits = allTRs.filter(tr =>
+        tr.number.toLowerCase().includes(ql) ||
+        tr.owner.toLowerCase().includes(ql) ||
+        tr.description.toLowerCase().includes(ql)
+      ).slice(0, 20);
+      if (!hits.length) { list.style.display = 'none'; return; }
+      list.innerHTML = '';
+      hits.forEach(tr => {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding:.5rem .75rem;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.95rem';
+        li.onmouseenter = () => li.style.background = 'var(--off-white)';
+        li.onmouseleave = () => li.style.background = '';
+        const num  = document.createElement('strong');
+        const rest = document.createElement('span');
+        num.textContent  = tr.number;
+        rest.textContent = ' — ' + tr.description + ' (' + tr.owner + ')';
+        rest.style.color = '#666';
+        li.appendChild(num);
+        li.appendChild(rest);
+        li.addEventListener('click', () => {
+          input.value = tr.number;
+          list.style.display = 'none';
+        });
+        list.appendChild(li);
+      });
+      list.style.display = 'block';
+    }
+
+    input.addEventListener('input',  () => showSuggestions(input.value));
+    input.addEventListener('focus',  () => showSuggestions(input.value));
+    document.addEventListener('click', e => {
+      if (!list.contains(e.target) && e.target !== input) list.style.display = 'none';
+    });
+  </script>
 </body>
 </html>

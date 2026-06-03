@@ -217,7 +217,14 @@ func TestGetStatus_UnknownID_Returns404(t *testing.T) {
 	}
 }
 
-func TestGetTransportRequests_ReturnsSortedOptions(t *testing.T) {
+// openTR mirrors the JSON shape the handler sends to the browser.
+type openTR struct {
+	Number      string `json:"number"`
+	Owner       string `json:"owner"`
+	Description string `json:"description"`
+}
+
+func TestGetTransportRequests_ReturnsJSONSortedDescending(t *testing.T) {
 	lister := &fakeTransportRequestLister{
 		requests: []adt.TransportRequest{
 			{Number: "NPLK900001", Description: "Old TR", Owner: "USER1"},
@@ -236,22 +243,27 @@ func TestGetTransportRequests_ReturnsSortedOptions(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status: got %d, want 200", w.Code)
 	}
-	body := w.Body.String()
-	pos14 := strings.Index(body, "NPLK900014")
-	pos07 := strings.Index(body, "NPLK900007")
-	pos01 := strings.Index(body, "NPLK900001")
-	if pos14 < 0 || pos07 < 0 || pos01 < 0 {
-		t.Fatalf("missing TR numbers in response: %s", body)
+	if ct := w.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Errorf("Content-Type: got %q, want application/json", ct)
 	}
-	if pos14 >= pos07 || pos07 >= pos01 {
-		t.Errorf("TRs not in descending order: pos14=%d pos07=%d pos01=%d", pos14, pos07, pos01)
+	var result []openTR
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("parse JSON: %v — body: %s", err, w.Body.String())
 	}
-	if !strings.Contains(body, "New TR") || !strings.Contains(body, "USER2") {
-		t.Errorf("description/owner missing: %s", body)
+	if len(result) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(result))
+	}
+	// Descending by number: 014 first, 007 second, 001 last.
+	if result[0].Number != "NPLK900014" || result[1].Number != "NPLK900007" || result[2].Number != "NPLK900001" {
+		t.Errorf("wrong sort order: %v", result)
+	}
+	// Owner and description must be present.
+	if result[0].Owner != "USER2" || result[0].Description != "New TR" {
+		t.Errorf("owner/description wrong: %+v", result[0])
 	}
 }
 
-func TestGetTransportRequests_HTMLEscapesSpecialChars(t *testing.T) {
+func TestGetTransportRequests_JSONSafeSpecialChars(t *testing.T) {
 	lister := &fakeTransportRequestLister{
 		requests: []adt.TransportRequest{
 			{Number: "NPLK900014", Description: `TR & <fix> "bug"`, Owner: `U<S>ER`},
@@ -265,18 +277,20 @@ func TestGetTransportRequests_HTMLEscapesSpecialChars(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	body := w.Body.String()
-	// Raw special chars must never appear unescaped in the HTML.
-	if strings.Contains(body, "<fix>") || strings.Contains(body, `"bug"`) || strings.Contains(body, "<S>") {
-		t.Errorf("unescaped HTML in response: %s", body)
+	var result []openTR
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("parse JSON: %v", err)
 	}
-	// Escaped forms must be present.
-	if !strings.Contains(body, "&amp;") || !strings.Contains(body, "&lt;fix&gt;") {
-		t.Errorf("expected HTML-escaped content in response: %s", body)
+	// JSON unmarshaling should correctly decode the special characters.
+	if result[0].Description != `TR & <fix> "bug"` {
+		t.Errorf("description mangled: %q", result[0].Description)
+	}
+	if result[0].Owner != `U<S>ER` {
+		t.Errorf("owner mangled: %q", result[0].Owner)
 	}
 }
 
-func TestGetTransportRequests_ADTError_ReturnsEmpty(t *testing.T) {
+func TestGetTransportRequests_ADTError_ReturnsEmptyArray(t *testing.T) {
 	lister := &fakeTransportRequestLister{err: fmt.Errorf("ADT unreachable")}
 	store := newFakeStore("00000000-0000-0000-0000-000000000011")
 	tmpl := ui.MustLoadTemplates()
@@ -289,12 +303,16 @@ func TestGetTransportRequests_ADTError_ReturnsEmpty(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("ADT error must not bubble as non-200, got %d", w.Code)
 	}
-	if w.Body.String() != "" {
-		t.Errorf("expected empty body on ADT error, got: %s", w.Body.String())
+	var result []openTR
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("expected valid JSON on error, got: %s", w.Body.String())
+	}
+	if len(result) != 0 {
+		t.Errorf("expected empty array on ADT error, got %d items", len(result))
 	}
 }
 
-func TestGetTransportRequests_NilLister_ReturnsEmpty(t *testing.T) {
+func TestGetTransportRequests_NilLister_ReturnsEmptyArray(t *testing.T) {
 	store := newFakeStore("00000000-0000-0000-0000-000000000012")
 	tmpl := ui.MustLoadTemplates()
 	r := newRouterWithLister(store, &fakeRunner{}, nil, tmpl)
@@ -306,7 +324,11 @@ func TestGetTransportRequests_NilLister_ReturnsEmpty(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("nil lister must return 200, got %d", w.Code)
 	}
-	if w.Body.String() != "" {
-		t.Errorf("nil lister must return empty body, got: %s", w.Body.String())
+	var result []openTR
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("expected valid JSON for nil lister, got: %s", w.Body.String())
+	}
+	if len(result) != 0 {
+		t.Errorf("nil lister must return empty array, got %d items", len(result))
 	}
 }
