@@ -24,8 +24,8 @@ flowchart LR
 
 ## Why direct ADT wiring, not an MCP server
 
-We considered using [mcp-server-abap](https://github.com/Hochfrequenz/mcp-server-abap) (also by Hochfrequenz) as the SAP integration layer.
-We decided against it because mcp-server-abap is a local stdio process: it cannot receive the SOCKS5 proxy configuration that BTP injects at runtime into CF apps, so it has no path through the Cloud Connector to the on-premise SAP system.
+We considered using [aibap.mcp](https://github.com/Hochfrequenz/aibap.mcp) (also by Hochfrequenz) as the SAP integration layer.
+We decided against it because aibap.mcp is a local stdio process: it cannot receive the SOCKS5 proxy configuration that BTP injects at runtime into CF apps, so it has no path through the Cloud Connector to the on-premise SAP system.
 Integrating it would mean a second CF app and the same SOCKS5 transport-injection work — with no meaningful gain for the read-only scope we need.
 
 Direct wiring via [adtler](https://github.com/Hochfrequenz/adtler) (the Go ADT client library) keeps everything in a single CF app with BTP auth fully wired.
