@@ -69,7 +69,7 @@ func main() {
 	runner := agent.NewRunner(agentTools, claudeClient)
 	tmpl := ui.MustLoadTemplates()
 
-	r := buildRouter(validator, logger, store, runner, tmpl, ctx)
+	r := buildRouter(validator, logger, store, runner, adtClient, tmpl, ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -198,6 +198,7 @@ func buildRouter(
 	logger *slog.Logger,
 	store reviewstore.JobStore,
 	runner aireview.ReviewRunner,
+	lister aireview.TransportRequestLister,
 	tmpl ui.Templates,
 	rootCtx context.Context,
 ) *gin.Engine {
@@ -265,8 +266,7 @@ func buildRouter(
 	})
 
 	// HTMX API routes (JWT-gated via the api group)
-	// TODO: pass adtClient as TransportRequestLister once Task 2 wires production lister
-	aireview.Register(api, rootCtx, store, runner, nil, tmpl)
+	aireview.Register(api, rootCtx, store, runner, lister, tmpl)
 
 	return r
 }
