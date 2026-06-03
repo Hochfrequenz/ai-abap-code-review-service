@@ -1,9 +1,9 @@
 {
-  "name": "go-btp-mwe-web",
+  "name": "ai-abap-code-review-service-web",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "description": "SAP approuter in front of the Go BTP MWE backend",
+  "description": "SAP approuter in front of the AI ABAP Code Review Service backend",
   "type": "commonjs",
   "scripts": {
     "start": "node node_modules/@sap/approuter/approuter.js"

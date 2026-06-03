@@ -16,7 +16,7 @@ env:
   CF_API: https://api.cf.eu10.hana.ondemand.com
   CF_ORG: HF Dev Account_hf-cf
   CF_SPACE: dev
-  BACKEND_HOST: go-btp-mwe
+  BACKEND_HOST: ai-abap-code-review-service
   DOMAIN: cfapps.eu10.hana.ondemand.com
 
 jobs:

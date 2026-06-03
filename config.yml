@@ -19,7 +19,7 @@ app:
   # CF backend app name. The approuter is auto-derived as <name>-web
   # (see manifest.yml). Must follow CF app-name rules: lowercase
   # alphanumeric with hyphens, no leading or trailing hyphen.
-  name: go-btp-mwe
+  name: ai-abap-code-review-service
 
   # Go module path — exactly what ends up in go.mod and in every Go
   # import. Host/org/repo style, e.g. github.com/yourorg/your-repo.
@@ -28,9 +28,9 @@ app:
 # CF service instance names the backend binds to. Leave any field blank
 # to derive it as `<app.name>-xsuaa` / `-dest` / `-cc`.
 services:
-  xsuaa:        go-xsuaa
-  destination:  go-dest
-  connectivity: go-cc
+  xsuaa:        ai-abap-code-review-service-xsuaa
+  destination:  ai-abap-code-review-service-dest
+  connectivity: ai-abap-code-review-service-cc
 
 # Hard-coded literals that surface inside `examples/`. apply-config
 # rewrites every quoted occurrence across examples/**/*.go (handlers
