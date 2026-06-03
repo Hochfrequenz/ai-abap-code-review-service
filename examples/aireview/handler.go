@@ -118,23 +118,15 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// Debug rc8: try no status filter to see if adtler returns anything.
-		slog.InfoContext(c.Request.Context(), "transport-requests calling ADT", "user", "kleink", "status", "")
-		trs, err := lister.GetTransportRequests(c.Request.Context(), "kleink", "")
-		slog.InfoContext(c.Request.Context(), "transport-requests ADT returned", "count", len(trs), "err", err)
+		// Empty user = all users' TRs; status "D" = modifiable (open) only.
+		// adtler v0.2.2 handles both legacy NW and modern S/4HANA XML formats.
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
+			// Best-effort: a broken ADT connection must not break the form.
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		sample := make([]string, 0, min(5, len(trs)))
-		for i, tr := range trs {
-			if i >= 5 {
-				break
-			}
-			sample = append(sample, tr.Number+"/"+tr.Status)
-		}
-		slog.InfoContext(c.Request.Context(), "transport-requests result", "count", len(trs), "sample", sample)
 		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
 		var b strings.Builder
 		for _, tr := range trs {
