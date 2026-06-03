@@ -244,6 +244,9 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err := json.Unmarshal(input, &args); err != nil {
 			return "", err
 		}
+		if len(args.ObjectURIs) == 0 {
+			return "[]", nil // nothing to check
+		}
 		result, err := r.tools.RunATCCheck(ctx, args.ObjectURIs, args.CheckVariant)
 		if err != nil {
 			return "", err
@@ -360,7 +363,7 @@ func (r *Runner) buildToolDefs() []anthropic.ToolUnionParam {
 		{
 			OfTool: &anthropic.ToolParam{
 				Name:        "run_atc_check",
-				Description: anthropic.String("Run SAP's ATC (ABAP Test Cockpit) static analysis on one or more objects. Returns prioritised findings (1=error, 2=warning, 3=info) with check name and message. This is SAP's own quality gate — use it on all objects in the transport before writing the review."),
+				Description: anthropic.String("Run SAP's ATC (ABAP Test Cockpit) static analysis on one or more objects. Returns prioritised findings (priority field: \"1\"=error, \"2\"=warning, \"3\"=info — string values, not integers) with check name and message. This is SAP's own quality gate — use it on all objects in the transport before writing the review."),
 				InputSchema: anthropic.ToolInputSchemaParam{
 					Properties: map[string]any{
 						"object_uris":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "List of ADT URIs to check (PROG/CLAS/INTF only; skip empty URIs)"},

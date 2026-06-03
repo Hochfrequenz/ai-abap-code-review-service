@@ -101,6 +101,21 @@ func TestRunner_DispatchTools(t *testing.T) {
 			toolInput: map[string]any{"class_uri": "/sap/bc/adt/oo/classes/zcl_foo"},
 			sources:   map[string]string{"/sap/bc/adt/oo/classes/zcl_foo/definitions": "DEFINITION."},
 		},
+		{
+			name:      "syntax_check",
+			toolName:  "syntax_check",
+			toolInput: map[string]any{"object_uri": "/sap/bc/adt/oo/classes/zcl_foo"},
+			sources:   map[string]string{}, // syntax_check doesn't use sources
+		},
+		{
+			name:     "run_atc_check",
+			toolName: "run_atc_check",
+			toolInput: map[string]any{
+				"object_uris":   []string{"/sap/bc/adt/oo/classes/zcl_foo"},
+				"check_variant": "",
+			},
+			sources: map[string]string{},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

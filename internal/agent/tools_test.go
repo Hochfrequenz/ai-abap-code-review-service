@@ -16,6 +16,7 @@ type fakeADTClient struct {
 	trErr          error
 	srcErr         error
 	syntaxMessages []adt.SyntaxMessage
+	syntaxErr      error
 	objectInfo     *adt.ObjectInfo
 	versionHistory []adt.VersionInfo
 	whereUsed      []adt.ObjectInfo
@@ -45,7 +46,7 @@ func (f *fakeADTClient) GetIncludeSource(_ context.Context, uri, include string)
 	return &adt.SourceResult{Source: src}, nil
 }
 func (f *fakeADTClient) SyntaxCheck(_ context.Context, _ string) ([]adt.SyntaxMessage, error) {
-	return f.syntaxMessages, nil
+	return f.syntaxMessages, f.syntaxErr
 }
 func (f *fakeADTClient) GetObjectInfo(_ context.Context, _ string) (*adt.ObjectInfo, error) {
 	if f.objectInfo == nil {
@@ -254,5 +255,14 @@ func TestFetchClassIncludes_ReturnsAvailableIncludes(t *testing.T) {
 	}
 	if _, ok := result["testclasses"]; ok {
 		t.Error("testclasses should be absent")
+	}
+}
+
+func TestSyntaxCheck_PropagatesError(t *testing.T) {
+	fake := &fakeADTClient{syntaxErr: errors.New("ADT unreachable")}
+	tools := agent.NewTools(fake)
+	_, err := tools.SyntaxCheck(context.Background(), "/sap/bc/adt/oo/classes/zcl_foo")
+	if err == nil {
+		t.Error("expected error to propagate")
 	}
 }
