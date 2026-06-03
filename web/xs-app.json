@@ -1,5 +1,4 @@
 {
-  "welcomeFile": "/",
   "authenticationMethod": "route",
   "sessionTimeout": 30,
   "routes": [
