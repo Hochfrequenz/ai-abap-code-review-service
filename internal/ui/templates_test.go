@@ -2,10 +2,12 @@
 package ui_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
@@ -88,4 +90,39 @@ func mustRenderStatus(t *testing.T, tmpl ui.Templates, job *reviewstore.Job) str
 		t.Fatalf("RenderStatus: %v", err)
 	}
 	return out
+}
+
+// TestModelSelectOptionsMatchAllowedModels guards against drift between the
+// hardcoded <option value="..."> entries in index.html and agent.AllowedModels().
+// If a model is added to AllowedModels() but not the HTML (or vice versa), this test fails.
+func TestModelSelectOptionsMatchAllowedModels(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	html, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+
+	// Extract all <option value="..."> inside the #model select.
+	// We rely on the select having id="model" and the options following it.
+	re := regexp.MustCompile(`<option value="([^"]+)"`)
+	matches := re.FindAllStringSubmatch(html, -1)
+
+	htmlValues := make(map[string]bool)
+	for _, m := range matches {
+		if len(m) > 1 {
+			htmlValues[m[1]] = true
+		}
+	}
+
+	allowed := agent.AllowedModels()
+	for modelID := range allowed {
+		if !htmlValues[modelID] {
+			t.Errorf("AllowedModels key %q has no matching <option value> in index.html", modelID)
+		}
+	}
+	for htmlVal := range htmlValues {
+		if _, ok := allowed[htmlVal]; !ok {
+			t.Errorf("index.html has <option value=%q> which is not in AllowedModels()", htmlVal)
+		}
+	}
 }

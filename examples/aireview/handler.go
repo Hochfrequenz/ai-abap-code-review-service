@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
@@ -68,7 +69,7 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 		if req.Model != "" {
 			if _, ok := agent.AllowedModels()[req.Model]; !ok {
 				btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
-					fmt.Sprintf("unbekanntes Modell %q — erlaubt: %v", req.Model, allowedModelKeys()), nil)
+					fmt.Sprintf("unbekanntes Modell %q — erlaubt: %s", req.Model, allowedModelKeys()), nil)
 				return
 			}
 		}
@@ -162,10 +163,11 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 	}
 }
 
-func allowedModelKeys() []string {
+func allowedModelKeys() string {
 	keys := make([]string, 0, len(agent.AllowedModels()))
 	for k := range agent.AllowedModels() {
 		keys = append(keys, k)
 	}
-	return keys
+	sort.Strings(keys)
+	return strings.Join(keys, ", ")
 }
