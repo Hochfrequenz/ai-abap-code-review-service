@@ -118,20 +118,20 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// The XSUAA JWT user_name is an email, not a SAP username — pass empty user
-		// so SAP CTS returns all users' TRs. Pass status "D" so SAP filters to
-		// modifiable (open) TRs only; adtler's bucket parsing handles the rest.
-		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
+		// Debug rc7: hardcode user "kleink" — confirmed to have open TRs on HF_S4.
+		// Remove once we confirm ADT returns data.
+		debugUser := "kleink"
+		slog.InfoContext(c.Request.Context(), "transport-requests calling ADT", "user", debugUser)
+		trs, err := lister.GetTransportRequests(c.Request.Context(), debugUser, "D")
+		slog.InfoContext(c.Request.Context(), "transport-requests ADT returned", "count", len(trs), "err", err)
 		if err != nil {
-			// Best-effort: a broken ADT connection must not break the form.
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// Debug: log count and first few TR numbers to diagnose empty results.
-		sample := make([]string, 0, min(3, len(trs)))
+		sample := make([]string, 0, min(5, len(trs)))
 		for i, tr := range trs {
-			if i >= 3 {
+			if i >= 5 {
 				break
 			}
 			sample = append(sample, tr.Number+"/"+tr.Status)
