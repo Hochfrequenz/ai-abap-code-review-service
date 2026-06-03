@@ -128,6 +128,15 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
+		// Debug: log count and first few TR numbers to diagnose empty results.
+		sample := make([]string, 0, min(3, len(trs)))
+		for i, tr := range trs {
+			if i >= 3 {
+				break
+			}
+			sample = append(sample, tr.Number+"/"+tr.Status)
+		}
+		slog.InfoContext(c.Request.Context(), "transport-requests result", "count", len(trs), "sample", sample)
 		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
 		var b strings.Builder
 		for _, tr := range trs {
