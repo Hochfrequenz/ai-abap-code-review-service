@@ -16,6 +16,39 @@ import (
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
+// Test_healthzHandler_Returns503_WhenRequiredEnvVarMissing pins that /healthz
+// reports unhealthy when a required env var (e.g. ANTHROPIC_API_KEY) is empty.
+// A server that starts fine but cannot make Claude API calls should not
+// advertise itself as healthy.
+func Test_healthzHandler_Returns503_WhenRequiredEnvVarMissing(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "") // ensure absent
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/healthz", healthzHandler([]string{"ANTHROPIC_API_KEY"}))
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	then.AssertThat(t, w.Code, is.EqualTo(http.StatusServiceUnavailable))
+	then.AssertThat(t, strings.Contains(w.Body.String(), "ANTHROPIC_API_KEY"), is.True())
+}
+
+// Test_healthzHandler_Returns200_WhenAllEnvVarsSet pins the happy path.
+func Test_healthzHandler_Returns200_WhenAllEnvVarsSet(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/healthz", healthzHandler([]string{"ANTHROPIC_API_KEY"}))
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	then.AssertThat(t, w.Code, is.EqualTo(http.StatusOK))
+	then.AssertThat(t, w.Body.String(), is.EqualTo("ok"))
+}
+
 // Test_logLevelFromEnv_MapsKnownAndUnknown pins the LOG_LEVEL contract
 // that lives in the README §"Logging" section: debug/info/error are
 // recognised, empty defaults to INFO, and anything else (crucially
