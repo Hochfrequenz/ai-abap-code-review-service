@@ -29,6 +29,14 @@ func ObjectURI(obj adt.TransportObject) string {
 		return "/sap/bc/adt/oo/classes/" + name
 	case "INTF":
 		return "/sap/bc/adt/oo/interfaces/" + name
+	// CDS objects — all served by the DDL sources endpoint.
+	// DDLX (view extensions) share the same endpoint as DDLS (view definitions).
+	// DCLS (access control) uses the ACM DCL endpoint.
+	// Confirmed working via ADT MCP; BDEF is excluded (namespace encoding broken on this endpoint).
+	case "DDLS", "DDLX":
+		return "/sap/bc/adt/ddic/ddl/sources/" + name
+	case "DCLS":
+		return "/sap/bc/adt/acm/dcl/sources/" + name
 	default:
 		return ""
 	}

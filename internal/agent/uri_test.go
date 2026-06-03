@@ -15,6 +15,11 @@ func TestObjectURI_KnownTypes(t *testing.T) {
 		{adt.TransportObject{Type: "PROG", Name: "ZREPORT"}, "/sap/bc/adt/programs/programs/zreport"},
 		{adt.TransportObject{Type: "CLAS", Name: "ZCL_EXAMPLE"}, "/sap/bc/adt/oo/classes/zcl_example"},
 		{adt.TransportObject{Type: "INTF", Name: "ZIF_EXAMPLE"}, "/sap/bc/adt/oo/interfaces/zif_example"},
+		{adt.TransportObject{Type: "DDLS", Name: "ZV_EXAMPLE"}, "/sap/bc/adt/ddic/ddl/sources/zv_example"},
+		{adt.TransportObject{Type: "DDLX", Name: "ZVX_EXAMPLE"}, "/sap/bc/adt/ddic/ddl/sources/zvx_example"},
+		{adt.TransportObject{Type: "DCLS", Name: "ZAC_EXAMPLE"}, "/sap/bc/adt/acm/dcl/sources/zac_example"},
+		// Namespaced CDS object — same lowercasing convention as PROG/CLAS/INTF.
+		{adt.TransportObject{Type: "DDLS", Name: "/HFQ/C_BPEM_OBJ"}, "/sap/bc/adt/ddic/ddl/sources//hfq/c_bpem_obj"},
 	}
 	for _, tt := range tests {
 		got := agent.ObjectURI(tt.obj)
