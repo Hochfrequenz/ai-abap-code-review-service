@@ -90,7 +90,7 @@ func (r *Runner) Preflight(ctx context.Context, trID string) error {
 	}
 	// E071 has rows but the ADT endpoint returned nothing: SYST/CUST transport.
 	// The current toolset cannot fetch source from these transports via ADT.
-	return fmt.Errorf("Transportauftrag %q enthält Systemobjekte (SYST/CUST), die über den ADT-Endpunkt nicht abrufbar sind", trID)
+	return fmt.Errorf("kein Quellcode abrufbar für %q — der Transport enthält Systemobjekte (SYST/CUST), die der ADT-Endpunkt nicht zurückgibt", trID)
 }
 
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
