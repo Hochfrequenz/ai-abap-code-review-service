@@ -21,9 +21,10 @@ import (
 // AI backend. Swap the implementation in cmd/server/main.go to replace Claude
 // with a different AI provider (e.g. OpenAI, Gemini) without touching the
 // handler or any other layer.
-// model must be a non-empty key from agent.AllowedModels(); empty string is rejected with 400.
+// model must be a non-empty key from agent.AllowedModels(); promptKey must be a non-empty
+// key from agent.AllowedPrompts(). Empty string is rejected with 400.
 type ReviewRunner interface {
-	Run(ctx context.Context, trID, model string) (string, error)
+	Run(ctx context.Context, trID, model, promptKey string) (string, error)
 }
 
 // TransportRequestLister retrieves open CTS transport requests from SAP ADT.
@@ -38,9 +39,11 @@ type reviewRequest struct {
 	// form tag covers HTMX's default application/x-www-form-urlencoded submissions;
 	// json tag covers direct API calls with Content-Type: application/json.
 	TransportRequestID string `json:"transport_request_id" form:"transport_request_id" binding:"required,uppercase,min=9,max=10"`
-	// Model is a required Claude model ID from agent.AllowedModels().
+	// Model is a Claude model ID from agent.AllowedModels().
 	// The form <select> always submits a value; direct API calls must supply one.
 	Model string `json:"model" form:"model"`
+	// Prompt is the review style key from agent.AllowedPrompts().
+	Prompt string `json:"prompt" form:"prompt"`
 }
 
 const contentTypeHTML = "text/html; charset=utf-8"
@@ -65,6 +68,13 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 			return
 		}
 
+		// Prompt is required — must be a key from agent.AllowedPrompts().
+		// No silent defaulting: the form always submits a value via the <select>.
+		if _, ok := agent.AllowedPrompts()[req.Prompt]; !ok {
+			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
+				fmt.Sprintf("Rezensions-Stil unbekannt %q — erlaubt: %s", req.Prompt, allowedPromptKeys()), nil)
+			return
+		}
 		// Model is required — must be a key from agent.AllowedModels().
 		// No silent defaulting: the form always submits a value via the <select>.
 		if _, ok := agent.AllowedModels()[req.Model]; !ok {
@@ -80,15 +90,15 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 		}
 
 		// Use context.WithoutCancel so the goroutine outlives the HTTP response.
-		go func(ctx context.Context, jobID, trID, model string) {
+		go func(ctx context.Context, jobID, trID, model, promptKey string) {
 			_ = store.MarkRunning(ctx, jobID)
-			md, runErr := runner.Run(ctx, trID, model)
+			md, runErr := runner.Run(ctx, trID, model, promptKey)
 			if runErr != nil {
 				_ = store.MarkFailed(ctx, jobID, runErr.Error())
 				return
 			}
 			_ = store.MarkDone(ctx, jobID, md)
-		}(context.WithoutCancel(rootCtx), job.ID, job.TRID, req.Model)
+		}(context.WithoutCancel(rootCtx), job.ID, job.TRID, req.Model, req.Prompt)
 
 		fragment := fmt.Sprintf(
 			`<p>Review gestartet — <a href="/reviews/%s">Ergebnisse anzeigen</a></p>`+
@@ -165,6 +175,15 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 func allowedModelKeys() string {
 	keys := make([]string, 0, len(agent.AllowedModels()))
 	for k := range agent.AllowedModels() {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ", ")
+}
+
+func allowedPromptKeys() string {
+	keys := make([]string, 0, len(agent.AllowedPrompts()))
+	for k := range agent.AllowedPrompts() {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

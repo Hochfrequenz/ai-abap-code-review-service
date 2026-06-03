@@ -58,7 +58,7 @@ func (f *fakeStore) MarkFailed(_ context.Context, _ string, errMsg string) error
 
 type fakeRunner struct{}
 
-func (f *fakeRunner) Run(_ context.Context, _, _ string) (string, error) {
+func (f *fakeRunner) Run(_ context.Context, _, _, _ string) (string, error) {
 	return "# Review\n\nAll good.", nil
 }
 
@@ -91,6 +91,7 @@ func TestPost_UnknownModel_Returns400(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{
 		"transport_request_id": "NPLK900014",
 		"model":                "gpt-4-not-allowed",
+		"prompt":               "review_pedantic",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -110,6 +111,7 @@ func TestPost_EmptyModel_Returns400(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{
 		"transport_request_id": "NPLK900014",
 		"model":                "",
+		"prompt":               "review_pedantic",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -126,7 +128,7 @@ func TestPost_ValidBody_Returns200WithLink(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
-	body, _ := json.Marshal(map[string]string{"transport_request_id": "NPLK900014", "model": "claude-opus-4-8"})
+	body, _ := json.Marshal(map[string]string{"transport_request_id": "NPLK900014", "model": "claude-opus-4-8", "prompt": "review_pedantic"})
 	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -150,7 +152,7 @@ func TestPost_FormEncoded_Returns200WithLink(t *testing.T) {
 
 	// HTMX submits forms as application/x-www-form-urlencoded by default.
 	req := httptest.NewRequest(http.MethodPost, "/api/reviews",
-		strings.NewReader("transport_request_id=NPLK900014&model=claude-opus-4-8"))
+		strings.NewReader("transport_request_id=NPLK900014&model=claude-opus-4-8&prompt=review_pedantic"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -183,7 +185,7 @@ func TestPost_GoroutineCallsMarkDone(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	r := newRouter(store, &fakeRunner{}, tmpl)
 
-	body, _ := json.Marshal(map[string]string{"transport_request_id": "NPLK900014", "model": "claude-opus-4-8"})
+	body, _ := json.Marshal(map[string]string{"transport_request_id": "NPLK900014", "model": "claude-opus-4-8", "prompt": "review_pedantic"})
 	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -368,5 +370,45 @@ func TestGetTransportRequests_NilLister_ReturnsEmptyArray(t *testing.T) {
 	}
 	if len(result) != 0 {
 		t.Errorf("nil lister must return empty array, got %d items", len(result))
+	}
+}
+
+func TestPost_UnknownPrompt_Returns400(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000096")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouter(store, &fakeRunner{}, tmpl)
+
+	body, _ := json.Marshal(map[string]string{
+		"transport_request_id": "NPLK900014",
+		"model":                "claude-opus-4-8",
+		"prompt":               "not-a-real-style",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("unknown prompt must return 400, got %d — body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPost_EmptyPrompt_Returns400(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000097")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouter(store, &fakeRunner{}, tmpl)
+
+	body, _ := json.Marshal(map[string]string{
+		"transport_request_id": "NPLK900014",
+		"model":                "claude-opus-4-8",
+		"prompt":               "",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("empty prompt must return 400, got %d — body: %s", w.Code, w.Body.String())
 	}
 }
