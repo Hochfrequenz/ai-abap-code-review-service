@@ -31,11 +31,13 @@ func (s *SQLTransportLister) GetTransportRequests(ctx context.Context, user, sta
 	// Build E070 query — modifiable TRs, excluding SAP-owned standard packages.
 	// SAP-owned TRs (AS4USER='SAP') are standard package transports, not customer
 	// development — they clog the list and are never useful for code review.
-	where := "TRSTATUS = 'D' AND AS4USER <> 'SAP'"
+	// STRKORR = '' selects only top-level Transportaufträge (requests), not
+	// Transportaufgaben (tasks). Tasks have STRKORR pointing at their parent request.
+	where := "TRSTATUS = 'D' AND AS4USER <> 'SAP' AND STRKORR = ''"
 	if status == "L" {
-		where = "TRSTATUS = 'L' AND AS4USER <> 'SAP'"
+		where = "TRSTATUS = 'L' AND AS4USER <> 'SAP' AND STRKORR = ''"
 	} else if status != "" && status != "D" {
-		where = fmt.Sprintf("TRSTATUS = '%s' AND AS4USER <> 'SAP'", status)
+		where = fmt.Sprintf("TRSTATUS = '%s' AND AS4USER <> 'SAP' AND STRKORR = ''", status)
 	}
 	if user != "" {
 		where += fmt.Sprintf(" AND AS4USER = '%s'", user)
