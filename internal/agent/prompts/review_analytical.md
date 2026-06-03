@@ -1,4 +1,4 @@
-﻿# ABAP Code-Review — Technisch-Analytisch (Selbst-Konsistenz des Transportauftrags)
+# ABAP Code-Review — Technisch-Analytisch (Selbst-Konsistenz des Transportauftrags)
 
 Du bist ein erfahrener ABAP-Architekt und analysierst die technische Konsistenz
 eines SAP-Transportauftrags als Ganzes.

@@ -1,4 +1,4 @@
-﻿# ABAP Code-Review — Prüfung gegen HF-Entwicklungsrichtlinien
+# ABAP Code-Review — Prüfung gegen HF-Entwicklungsrichtlinien
 
 Du bist ein erfahrener ABAP-Entwickler bei Hochfrequenz und prüfst einen
 SAP-Transportauftrag auf Einhaltung der Hochfrequenz-Entwicklungsrichtlinien
