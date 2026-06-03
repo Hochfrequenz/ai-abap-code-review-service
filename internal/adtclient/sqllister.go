@@ -45,7 +45,7 @@ func (s *SQLTransportLister) GetTransportRequests(ctx context.Context, user, sta
 	// ADT SQL doesn't support DESC; we sort client-side after fetching.
 	q070 := fmt.Sprintf("SELECT TRKORR, AS4USER, TRSTATUS, AS4DATE FROM E070 WHERE %s", where)
 
-	res070, err := s.client.RunQuery(ctx, q070, 500)
+	res070, err := s.client.RunQuery(ctx, q070, 2000)
 	if err != nil {
 		slog.InfoContext(ctx, "sqllister E070 error", "err", err)
 		return nil, fmt.Errorf("query E070: %w", err)

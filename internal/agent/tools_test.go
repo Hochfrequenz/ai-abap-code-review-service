@@ -22,6 +22,8 @@ type fakeADTClient struct {
 	whereUsed      []adt.ObjectInfo
 	diffResult     *adt.DiffResult
 	atcResult      *adt.ATCResult
+	queryResult    *adt.QueryResult
+	queryErr       error
 }
 
 func (f *fakeADTClient) GetTransportObjects(_ context.Context, _ string) ([]adt.TransportObject, error) {
@@ -71,6 +73,9 @@ func (f *fakeADTClient) RunATCCheck(_ context.Context, _ []string, _ string) (*a
 		return &adt.ATCResult{}, nil
 	}
 	return f.atcResult, nil
+}
+func (f *fakeADTClient) RunQuery(_ context.Context, _ string, _ int) (*adt.QueryResult, error) {
+	return f.queryResult, f.queryErr
 }
 
 func TestListTRObjects_ReturnsObjectsWithURIs(t *testing.T) {

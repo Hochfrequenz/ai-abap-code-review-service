@@ -3,11 +3,13 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
@@ -250,6 +252,93 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	_, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err == nil {
 		t.Error("expected error for unexpected stop reason")
+	}
+}
+
+func TestRunner_Preflight_ADTError(t *testing.T) {
+	fake := &fakeADTClient{trErr: errors.New("connection refused")}
+	tools := agent.NewTools(fake)
+	runner := agent.NewRunner(tools, anthropic.NewClient(option.WithAPIKey("test")))
+
+	err := runner.Preflight(context.Background(), "NPLK000001")
+	if err == nil {
+		t.Fatal("expected error when ADT is unreachable, got nil")
+	}
+}
+
+func TestRunner_Preflight_EmptyTR(t *testing.T) {
+	fake := &fakeADTClient{
+		trObjects:   []adt.TransportObject{},
+		queryResult: &adt.QueryResult{Rows: [][]string{}},
+	}
+	tools := agent.NewTools(fake)
+	runner := agent.NewRunner(tools, anthropic.NewClient(option.WithAPIKey("test")))
+
+	err := runner.Preflight(context.Background(), "NPLK000001")
+	if err == nil {
+		t.Fatal("expected error for empty TR, got nil")
+	}
+}
+
+func TestRunner_Preflight_AllEmptyURIs_TruelyEmpty(t *testing.T) {
+	// ADT returns objects but none have URIs, and E071 also has no rows → truly empty.
+	fake := &fakeADTClient{
+		trObjects:   []adt.TransportObject{{PgmID: "R3TR", Type: "TABU", Name: "T001"}},
+		queryResult: &adt.QueryResult{Rows: [][]string{}},
+	}
+	tools := agent.NewTools(fake)
+	runner := agent.NewRunner(tools, anthropic.NewClient(option.WithAPIKey("test")))
+
+	err := runner.Preflight(context.Background(), "NPLK000001")
+	if err == nil {
+		t.Fatal("expected error when all URIs are empty and E071 empty, got nil")
+	}
+}
+
+func TestRunner_Preflight_SystTransport(t *testing.T) {
+	// ADT returns nothing (SYST type), but E071 has rows → inform user, don't claim empty.
+	fake := &fakeADTClient{
+		trObjects:   []adt.TransportObject{},
+		queryResult: &adt.QueryResult{Rows: [][]string{{"NPLK000001"}}},
+	}
+	tools := agent.NewTools(fake)
+	runner := agent.NewRunner(tools, anthropic.NewClient(option.WithAPIKey("test")))
+
+	err := runner.Preflight(context.Background(), "NPLK000001")
+	if err == nil {
+		t.Fatal("expected error for SYST transport, got nil")
+	}
+	if !strings.Contains(err.Error(), "SYST") {
+		t.Errorf("error should mention SYST, got: %v", err)
+	}
+}
+
+func TestRunner_Preflight_EmptyTR_E071AlsoEmpty(t *testing.T) {
+	// ADT returns nothing and E071 is also empty → transport has no objects at all.
+	fake := &fakeADTClient{
+		trObjects:   []adt.TransportObject{},
+		queryResult: &adt.QueryResult{Rows: [][]string{}},
+	}
+	tools := agent.NewTools(fake)
+	runner := agent.NewRunner(tools, anthropic.NewClient(option.WithAPIKey("test")))
+
+	err := runner.Preflight(context.Background(), "NPLK000001")
+	if err == nil {
+		t.Fatal("expected error for empty TR, got nil")
+	}
+}
+
+func TestRunner_Preflight_HasReviewableObject(t *testing.T) {
+	fake := &fakeADTClient{trObjects: []adt.TransportObject{
+		{PgmID: "R3TR", Type: "TABU", Name: "T001"},
+		{PgmID: "R3TR", Type: "CLAS", Name: "ZCL_EXAMPLE"},
+	}}
+	tools := agent.NewTools(fake)
+	runner := agent.NewRunner(tools, anthropic.NewClient(option.WithAPIKey("test")))
+
+	err := runner.Preflight(context.Background(), "NPLK000001")
+	if err != nil {
+		t.Fatalf("expected nil for TR with reviewable objects, got: %v", err)
 	}
 }
 

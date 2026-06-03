@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -19,9 +20,10 @@ import (
 )
 
 type fakeStore struct {
-	job    *reviewstore.Job
-	doneCh chan string
-	getErr error
+	job      *reviewstore.Job
+	doneCh   chan string
+	failedCh chan string
+	getErr   error
 }
 
 func newFakeStore(jobID string) *fakeStore {
@@ -32,7 +34,8 @@ func newFakeStore(jobID string) *fakeStore {
 			Status:    reviewstore.JobStatusPending,
 			CreatedAt: time.Now(),
 		},
-		doneCh: make(chan string, 1),
+		doneCh:   make(chan string, 1),
+		failedCh: make(chan string, 1),
 	}
 }
 
@@ -53,11 +56,15 @@ func (f *fakeStore) MarkDone(_ context.Context, _ string, md string) error {
 func (f *fakeStore) MarkFailed(_ context.Context, _ string, errMsg string) error {
 	f.job.Status = reviewstore.JobStatusFailed
 	f.job.ErrMsg = errMsg
+	f.failedCh <- errMsg
 	return nil
 }
 
-type fakeRunner struct{}
+type fakeRunner struct {
+	preflightErr error
+}
 
+func (f *fakeRunner) Preflight(_ context.Context, _ string) error { return f.preflightErr }
 func (f *fakeRunner) Run(_ context.Context, _, _, _ string) (string, error) {
 	return "# Review\n\nAll good.", nil
 }
@@ -198,6 +205,31 @@ func TestPost_GoroutineCallsMarkDone(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for MarkDone to be called")
+	}
+}
+
+func TestPost_PreflightFails_JobMarkedFailed(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000020")
+	tmpl := ui.MustLoadTemplates()
+	runner := &fakeRunner{preflightErr: errors.New("keine prüfbaren Objekte")}
+	r := newRouter(store, runner, tmpl)
+
+	body, _ := json.Marshal(map[string]string{"transport_request_id": "NPLK000001", "model": "claude-opus-4-8", "prompt": "review_pedantic"})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST must return 200 (job created), got %d", w.Code)
+	}
+	select {
+	case msg := <-store.failedCh:
+		if msg == "" {
+			t.Error("MarkFailed must be called with a non-empty error message")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for MarkFailed to be called")
 	}
 }
 

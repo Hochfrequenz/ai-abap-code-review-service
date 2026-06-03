@@ -66,6 +66,33 @@ func NewRunner(tools *Tools, client anthropic.Client) *Runner {
 	return &Runner{tools: tools, client: client}
 }
 
+// Preflight checks that trID refers to a transport with at least one reviewable
+// object (non-empty ADT URI) before any AI tokens are spent.
+// Returns a German user-facing error if the check fails.
+func (r *Runner) Preflight(ctx context.Context, trID string) error {
+	objs, err := r.tools.ListTRObjects(ctx, trID)
+	if err != nil {
+		return fmt.Errorf("ADT nicht erreichbar — bitte SAP-Verbindung und Cloud-Connector prüfen")
+	}
+	for _, obj := range objs {
+		if obj.URI != "" {
+			return nil
+		}
+	}
+	// ADT transport-objects endpoint returned nothing. This can mean two things:
+	// (a) the transport genuinely has no objects, or
+	// (b) it is a SYST/CUST-type transport that the endpoint silently omits.
+	// Query E071 to distinguish the two cases.
+	q := fmt.Sprintf("SELECT TRKORR FROM E071 WHERE TRKORR = '%s'", trID)
+	res, err := r.tools.RunQuery(ctx, q, 1)
+	if err != nil || res == nil || len(res.Rows) == 0 {
+		return fmt.Errorf("keine Objekte im Transportauftrag %q gefunden — bitte Nummer prüfen", trID)
+	}
+	// E071 has rows but the ADT endpoint returned nothing: SYST/CUST transport.
+	// The current toolset cannot fetch source from these transports via ADT.
+	return fmt.Errorf("kein Quellcode abrufbar für %q — der Transport enthält Systemobjekte (SYST/CUST), die der ADT-Endpunkt nicht zurückgibt", trID)
+}
+
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
 // and source code, then returns the final markdown review text.
 // model must be a non-empty key from AllowedModels(); promptKey must be a non-empty
