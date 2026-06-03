@@ -9,6 +9,12 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
+// Prompt pairs a German UI label with the compiled-in system prompt text.
+type Prompt struct {
+	Label string
+	Text  string
+}
+
 // AllowedModels returns the set of model IDs the service accepts, mapped to
 // a human-readable German label shown in the UI.
 func AllowedModels() map[string]string {
@@ -20,18 +26,33 @@ func AllowedModels() map[string]string {
 }
 
 // reviewMaxTokens is the maximum output token budget for the review.
-// Increase if large transports produce truncated reviews.
 const reviewMaxTokens = int64(8192)
 
-// reviewMaxToolLoops caps the tool-use iterations per review to prevent
-// runaway API spend if the model loops without progressing.
+// reviewMaxToolLoops caps the tool-use iterations per review.
 const reviewMaxToolLoops = 50
 
-// systemPrompt is the Claude system prompt embedded at build time.
-// Edit internal/agent/prompts/review_prompt.md to customise review criteria.
-//
-//go:embed prompts/review_prompt.md
-var systemPrompt string
+//go:embed prompts/review_pedantic.md
+var promptPedantic string
+
+//go:embed prompts/review_appreciative.md
+var promptAppreciative string
+
+//go:embed prompts/review_analytical.md
+var promptAnalytical string
+
+//go:embed prompts/review_guidelines_hf.md
+var promptGuidelinesHF string
+
+// AllowedPrompts returns the set of review styles the service accepts,
+// mapped to their German UI label and compiled-in system prompt text.
+func AllowedPrompts() map[string]Prompt {
+	return map[string]Prompt{
+		"review_pedantic":      {Label: "Pedantische Code-Review für erfahrene Entwickler*innen", Text: promptPedantic},
+		"review_appreciative":  {Label: "Wertschätzende Code-Review mit praktischen Tipps für Newbies", Text: promptAppreciative},
+		"review_analytical":    {Label: "Technisch-Analytische Code-Review (Selbst-Konsistenz des TA)", Text: promptAnalytical},
+		"review_guidelines_hf": {Label: "Prüfung gegen HF-Entwicklungsrichtlinien", Text: promptGuidelinesHF},
+	}
+}
 
 // Runner runs the Claude tool-use loop to produce an ABAP code review.
 type Runner struct {
@@ -47,9 +68,11 @@ func NewRunner(tools *Tools, client anthropic.Client) *Runner {
 
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
 // and source code, then returns the final markdown review text.
-// model must be a non-empty key from AllowedModels() — callers are responsible
-// for validation; Run does not default or substitute silently.
-func (r *Runner) Run(ctx context.Context, trID, model string) (string, error) {
+// model must be a non-empty key from AllowedModels(); promptKey must be a non-empty
+// key from AllowedPrompts(). Callers are responsible for validation — Run does not
+// default or substitute silently.
+func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string, error) {
+	promptText := AllowedPrompts()[promptKey].Text
 	messages := []anthropic.MessageParam{
 		anthropic.NewUserMessage(anthropic.NewTextBlock(
 			fmt.Sprintf("Please review transport request: %s", trID),
@@ -64,7 +87,7 @@ func (r *Runner) Run(ctx context.Context, trID, model string) (string, error) {
 			MaxTokens: reviewMaxTokens,
 			System: []anthropic.TextBlockParam{
 				{
-					Text:         systemPrompt,
+					Text:         promptText,
 					CacheControl: anthropic.NewCacheControlEphemeralParam(),
 				},
 			},
