@@ -12,7 +12,7 @@ import (
 	"github.com/corbym/gocrest/is"
 	"github.com/corbym/gocrest/then"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 )
 
 const vcapAppJSON = `{"application_id":"id","application_name":"go-btp-mwe","space_name":"dev","uris":["x"]}`

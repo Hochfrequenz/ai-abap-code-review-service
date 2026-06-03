@@ -136,6 +136,16 @@ func Run(root string, cfg *Config, dryRun bool) (*Result, error) {
 		res.Rewriters = append(res.Rewriters, p.result)
 	}
 
+	// Rewrite the sapClientNumber literal in internal/adtclient/factory.go.
+	adtClientPlan, err := planAdtClientSapClient(root, cfg)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range adtClientPlan {
+		plan = append(plan, p)
+		res.Rewriters = append(res.Rewriters, p.result)
+	}
+
 	// --- Phase 2: write. Only reached if every Transform in Phase 1
 	// succeeded, so a half-applied tree is impossible. ---
 	if dryRun {
@@ -429,7 +439,7 @@ func planExamplesDestination(root string, cfg *Config) ([]pending, error) {
 		if readErr != nil {
 			return readErr
 		}
-		newContent := re.ReplaceAll(old, replacement)
+		newContent := re.ReplaceAllLiteral(old, replacement)
 		rel, _ := filepath.Rel(root, p)
 		out = append(out, pending{
 			absPath: p,
@@ -443,6 +453,37 @@ func planExamplesDestination(root string, cfg *Config) ([]pending, error) {
 		return nil
 	})
 	return out, err
+}
+
+// planAdtClientSapClient rewrites the sapClientNumber literal in
+// internal/adtclient/factory.go to match config.yml's examples.sap_client.
+func planAdtClientSapClient(root string, cfg *Config) ([]pending, error) {
+	path := filepath.Join(root, "internal", "adtclient", "factory.go")
+	old, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("adtclient factory: read: %w", err)
+	}
+
+	re := regexp.MustCompile(`sapClientNumber\s*=\s*"([^"]+)"`)
+	m := re.FindSubmatch(old)
+	if m == nil {
+		return nil, nil
+	}
+	current := string(m[1])
+	desired := cfg.Examples.SapClient
+	rel := filepath.Join("internal", "adtclient", "factory.go")
+	if current == desired {
+		return []pending{{absPath: path, result: RewriterResult{Name: "adtclient sap_client", Path: rel, Before: old, After: old}}}, nil
+	}
+
+	newContent := re.ReplaceAllLiteral(old, []byte(`sapClientNumber = "`+desired+`"`))
+	return []pending{{
+		absPath: path,
+		result:  RewriterResult{Name: "adtclient sap_client", Path: rel, Before: old, After: newContent},
+	}}, nil
 }
 
 // discoverCurrentExamplesDestination walks examplesDir alphabetically

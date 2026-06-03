@@ -1,0 +1,18 @@
+{{- if eq .Status "done" -}}
+<article class="review">{{.ReviewHTML | safeHTML}}</article>
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+{{- else if eq .Status "failed" -}}
+<div class="error">Review failed: {{.ErrMsg}}</div>
+{{- else if eq .Status "running" -}}
+<div hx-get="/api/reviews/{{.ID}}/status"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML">
+  ⚙️ Running review for {{.TRID}}…
+</div>
+{{- else -}}
+<div hx-get="/api/reviews/{{.ID}}/status"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML">
+  ⏳ Reviewing {{.TRID}}…
+</div>
+{{- end -}}

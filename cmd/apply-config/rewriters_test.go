@@ -480,3 +480,16 @@ func Test_transformVarsExampleYml_PreservesCRLFLineEndings(t *testing.T) {
 		}
 	}
 }
+
+func TestPlanAdtClientSapClient_RewritesSapClient(t *testing.T) {
+	dir := t.TempDir()
+	factoryPath := filepath.Join(dir, "internal", "adtclient", "factory.go")
+	_ = os.MkdirAll(filepath.Dir(factoryPath), 0755)
+	_ = os.WriteFile(factoryPath, []byte("package adtclient\nconst (\n\tdestinationName = \"HF_S4\"\n\tsapClientNumber = \"100\"\n)\n"), 0644)
+
+	cfg := &Config{Examples: ExamplesConfig{DestinationName: "MY_DEST", SapClient: "200"}}
+	plan, err := planAdtClientSapClient(dir, cfg)
+	then.AssertThat(t, err, is.Nil())
+	then.AssertThat(t, len(plan) > 0, is.True())
+	then.AssertThat(t, string(plan[0].result.After), is.StringContaining(`"200"`))
+}

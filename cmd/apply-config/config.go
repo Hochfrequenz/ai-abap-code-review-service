@@ -34,6 +34,10 @@ type ExamplesConfig struct {
 	// reference. Replaces every occurrence of the prior literal in
 	// `examples/**/*.go` (handlers + tests).
 	DestinationName string `yaml:"destination_name"`
+	// SapClient is the three-digit SAP client number passed to adtler.
+	// Replaces the sapClientNumber literal in internal/adtclient/factory.go.
+	// Defaults to "100".
+	SapClient string `yaml:"sap_client"`
 }
 
 // AppConfig identifies the CF backend app and the Go module it lives in.
@@ -105,6 +109,10 @@ func (c *Config) applyDefaults() {
 		// `examples.destination_name` in their config.yml.
 		c.Examples.DestinationName = "HF_S4"
 	}
+	c.Examples.SapClient = strings.TrimSpace(c.Examples.SapClient)
+	if c.Examples.SapClient == "" {
+		c.Examples.SapClient = "100"
+	}
 	c.CF.API = strings.TrimSpace(c.CF.API)
 	c.CF.Org = strings.TrimSpace(c.CF.Org)
 	c.CF.Space = strings.TrimSpace(c.CF.Space)
@@ -161,6 +169,10 @@ func (c *Config) Validate() error {
 	}
 	if c.CF.Domain == "" {
 		errs = append(errs, "cf.domain is required")
+	}
+
+	if matched, _ := regexp.MatchString(`^\d{3}$`, c.Examples.SapClient); !matched {
+		errs = append(errs, fmt.Sprintf("examples.sap_client %q must be a three-digit number (000–999)", c.Examples.SapClient))
 	}
 
 	for _, s := range []struct{ name, val string }{

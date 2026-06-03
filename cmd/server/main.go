@@ -18,13 +18,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humagin"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/gin-gonic/gin"
 
-	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/adtcheckrun"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/examples/adtdiscovery"
-	"github.com/hochfrequenz/go-sap-btp-cf-template/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/examples/aireview"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/adtclient"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
 
 func main() {
@@ -46,13 +49,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	svc, err := btp.NewService(env, btp.WithUserAgent(buildUserAgent()))
+	adtClient, err := adtclient.NewFromBTPEnv(ctx, *env)
 	if err != nil {
-		logger.Error("btp service init failed", "err", err)
+		logger.Error("adtler client init failed", "err", err)
 		os.Exit(1)
 	}
 
-	r := buildRouter(validator, svc, svc, logger)
+	store := reviewstore.NewMemoryStore()
+	agentTools := agent.NewTools(adtClient)
+	// anthropic.NewClient reads ANTHROPIC_API_KEY from env — this is the
+	// documented default env var for the Anthropic Go SDK (anthropic.NewClient
+	// with no explicit key option falls back to os.Getenv("ANTHROPIC_API_KEY")).
+	claudeClient := anthropic.NewClient(
+		// "anthropic-beta: prompt-caching-2024-07-31" enables Anthropic's prompt
+		// caching API (see https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching).
+		// The SDK does not set this header automatically; it must be opted into explicitly.
+		option.WithHeader("anthropic-beta", "prompt-caching-2024-07-31"),
+	)
+	runner := agent.NewRunner(agentTools, claudeClient)
+	tmpl := ui.MustLoadTemplates()
+
+	r := buildRouter(validator, logger, store, runner, tmpl, ctx)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -169,22 +186,21 @@ func logLevelFromEnv() slog.Level {
 	}
 }
 
-// buildRouter wires the Gin router from its abstract dependencies —
-// NOT from *btp.Service directly. Handlers added here are testable
-// with a one-method fake (see examples/*_test.go) and decoupled from
-// any internal btp refactor.
-//
-// The set of routes below is the *constrained-proxy* pattern: every
-// endpoint has a fixed method, a fixed destination name, and a fixed
-// SAP path baked in at the registration site. That is deliberate —
-// strict typing at the Gin boundary requires a finite endpoint set.
-// A transparent `api.Any("/sap/:destination/*path", …)` route is
-// convenient but untyped by definition, and it turns the service
-// into a tunnel that carries the destination's technical-user
-// authority to any authenticated BTP caller. The template ships
-// without such a route; forks that genuinely need one should wire
-// `svc.ProxyHandler` themselves, gated behind `btp.RequireScope`.
-func buildRouter(validator *btp.JWTValidator, caller btp.OnPremCaller, mutator btp.OnPremMutator, logger *slog.Logger) *gin.Engine {
+const contentTypeHTML = "text/html; charset=utf-8"
+
+// buildRouter wires the Gin router from its abstract dependencies.
+// This service does NOT wire a transparent proxy route (api.Any("/sap/*path"))
+// because untyped pass-through routes carry the destination's technical-user
+// authority to any authenticated BTP caller. Instead every route has a fixed
+// method and a fixed handler — the constrained-proxy pattern.
+func buildRouter(
+	validator *btp.JWTValidator,
+	logger *slog.Logger,
+	store reviewstore.JobStore,
+	runner aireview.ReviewRunner,
+	tmpl ui.Templates,
+	rootCtx context.Context,
+) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	// The backend app is directly reachable on its .cfapps.* route, not
@@ -222,61 +238,38 @@ func buildRouter(validator *btp.JWTValidator, caller btp.OnPremCaller, mutator b
 		c.JSON(http.StatusOK, gin.H{"claims": claims})
 	})
 
-	// Mount a huma.API on top of the same Gin group. huma generates a
-	// real OpenAPI 3.1 spec from the handler signatures and serves it +
-	// a Swagger UI for free:
-	//
-	//   GET /api/openapi.json   — the spec (OpenAPI 3.1)
-	//   GET /api/openapi.yaml   — same, YAML
-	//   GET /api/docs           — Swagger UI rendered from the spec
-	//   GET /api/schemas/*      — referenced schemas
-	//
-	// They sit under /api so the JWT middleware applies — the spec
-	// describes a JWT-gated API; reading it requires the same auth.
-	// Forks that want public docs can move the huma mount to the
-	// engine root and drop validator from the operations directly,
-	// but the typical case (HF-internal API) is happier with gated
-	// docs.
-	hapi := humagin.NewWithGroup(r, api,
-		huma.DefaultConfig("Go SAP BTP CF Template", "0.1"))
+	// UI routes (no JWT — HTML shells; HTMX API calls under /api are JWT-gated)
+	r.GET("/", func(c *gin.Context) {
+		html, err := tmpl.RenderIndex()
+		if err != nil {
+			c.String(http.StatusInternalServerError, "template error")
+			return
+		}
+		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
+	})
+	// :id is a UUID v4 generated by reviewstore.NewMemoryStore().Create — the
+	// store guarantees UUID format. Callers that reach this route with a
+	// non-UUID id will receive a 404 from store.Get (unknown key), not a
+	// validation error; the brute-force surface is negligible for UUIDs.
+	r.GET("/reviews/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		job, err := store.Get(c.Request.Context(), id)
+		if err != nil {
+			c.String(http.StatusNotFound, "review not found")
+			return
+		}
+		html, err := tmpl.RenderReview(job)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "template error")
+			return
+		}
+		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
+	})
 
-	// Two constrained-proxy demos. Both are fully typed (JSON in,
-	// JSON out) — SAP's XML is consumed + parsed inside the handler,
-	// never emitted at the client boundary:
-	//   GET  /api/adt-discovery  → huma-style: typed Input/Output,
-	//                               appears in the OpenAPI spec.
-	//   POST /api/adt-checkrun   → gin-style: raw c.ShouldBindJSON,
-	//                               does NOT appear in the OpenAPI
-	//                               spec. Migrating it (and
-	//                               invoicesync) to huma is tracked
-	//                               as follow-up work — they read
-	//                               jwtClaims, which currently lives
-	//                               in the gin context map and needs
-	//                               a small adapter to surface in
-	//                               huma's context.Context.
-	adtdiscovery.Register(hapi, caller)
-	adtcheckrun.Register(api, mutator)
+	// HTMX API routes (JWT-gated via the api group)
+	aireview.Register(api, rootCtx, store, runner, tmpl)
 
 	return r
-}
-
-// buildUserAgent derives a traceable User-Agent from the compiled binary's
-// module path and version. Passing this through to btp.NewService means
-// SAP-side access logs and oncall traces see "my-service/v1.2.3" rather
-// than the template's literal name — exactly the move each fork should
-// make. debug.ReadBuildInfo can fail for unusual build setups (test
-// binaries, `go run`); the fallback keeps the service bootable.
-func buildUserAgent() string {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if p := info.Main.Path; p != "" && p != "command-line-arguments" {
-			ver := info.Main.Version
-			if ver == "" || ver == "(devel)" {
-				ver = "dev"
-			}
-			return p + "/" + ver
-		}
-	}
-	return btp.DefaultUserAgent
 }
 
 // recoverPanic replaces gin.Recovery() so panic responses honour the

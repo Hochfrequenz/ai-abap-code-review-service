@@ -1,8 +1,20 @@
 {
-  "welcomeFile": "/api/me",
+  "welcomeFile": "/",
   "authenticationMethod": "route",
   "sessionTimeout": 30,
   "routes": [
+    {
+      "source": "^/$",
+      "target": "/",
+      "destination": "GoBackend",
+      "authenticationType": "xsuaa"
+    },
+    {
+      "source": "^/reviews/(.*)$",
+      "target": "/reviews/$1",
+      "destination": "GoBackend",
+      "authenticationType": "xsuaa"
+    },
     {
       "source": "^/api/(.*)$",
       "target": "/api/$1",
