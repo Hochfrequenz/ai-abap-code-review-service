@@ -31,7 +31,10 @@ func Test_healthzHandler_Returns503_WhenRequiredEnvVarMissing(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	then.AssertThat(t, w.Code, is.EqualTo(http.StatusServiceUnavailable))
-	then.AssertThat(t, strings.Contains(w.Body.String(), "ANTHROPIC_API_KEY"), is.True())
+	var env btp.ErrorEnvelope
+	then.AssertThat(t, json.Unmarshal(w.Body.Bytes(), &env), is.Nil())
+	then.AssertThat(t, strings.Contains(env.Error.Message, "ANTHROPIC_API_KEY"), is.True())
+	then.AssertThat(t, env.Error.Code, is.EqualTo(btp.CodeInternal))
 }
 
 // Test_healthzHandler_Returns200_WhenAllEnvVarsSet pins the happy path.

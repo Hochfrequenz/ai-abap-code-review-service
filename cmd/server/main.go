@@ -336,18 +336,6 @@ func securityHeaders() gin.HandlerFunc {
 	}
 }
 
-// requestLog is a minimal structured access logger. gin.Logger() is fine
-// in dev but emits plain text that doesn't play nicely with BTP's
-// application logging service.
-//
-// Deliberate omissions:
-//   - Query string is NOT logged. Downstream services that put an ID
-//     or email in ?owner=… shouldn't have it land in the access log
-//     as a side effect. If a route needs that context, it belongs in
-//     the handler's slog line (audit trail), not in this generic one.
-//   - JWT claims are NOT logged. This is the access log — one line per
-//     request, no user identity. Handler-level slog.InfoContext with
-//     the claim is the right place.
 // healthzHandler returns 200 "ok" when all required env vars are non-empty,
 // or 503 with a JSON body listing the missing vars otherwise. This ensures
 // that a misconfigured deployment (e.g. missing ANTHROPIC_API_KEY) is
@@ -362,16 +350,26 @@ func healthzHandler(requiredEnvVars []string) gin.HandlerFunc {
 			}
 		}
 		if len(missing) > 0 {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status":  "unhealthy",
-				"missing": missing,
-			})
+			btp.AbortError(c, http.StatusServiceUnavailable, btp.CodeInternal,
+				"server misconfigured: missing required environment variables: "+strings.Join(missing, ", "), nil)
 			return
 		}
 		c.String(http.StatusOK, "ok")
 	}
 }
 
+// requestLog is a minimal structured access logger. gin.Logger() is fine
+// in dev but emits plain text that doesn't play nicely with BTP's
+// application logging service.
+//
+// Deliberate omissions:
+//   - Query string is NOT logged. Downstream services that put an ID
+//     or email in ?owner=… shouldn't have it land in the access log
+//     as a side effect. If a route needs that context, it belongs in
+//     the handler's slog line (audit trail), not in this generic one.
+//   - JWT claims are NOT logged. This is the access log — one line per
+//     request, no user identity. Handler-level slog.InfoContext with
+//     the claim is the right place.
 func requestLog(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
