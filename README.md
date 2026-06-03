@@ -22,33 +22,19 @@ flowchart LR
     end
 ```
 
-## Why direct ADT wiring instead of mcp-server-abap
+## Why direct ADT wiring, not mcp-server-abap
 
-[mcp-server-abap](https://github.com/Hochfrequenz/mcp-server-abap) is a production-quality MCP server that exposes ~50 SAP ADT tools and is also maintained by Hochfrequenz.
-The obvious question is: why not use it here instead of implementing ADT calls directly?
+[mcp-server-abap](https://github.com/Hochfrequenz/mcp-server-abap) (also by Hochfrequenz) exposes ~50 SAP ADT tools as an MCP server, so the question naturally arises — why wire ADT calls directly instead?
 
-**The short answer:** the BTP Cloud Connector makes it impractical.
+**BTP's Cloud Connector makes it impractical.**
+mcp-server-abap is a trusted local stdio process with no built-in network auth.
+Running it as a CF sidecar would require an auth layer *and* the same custom SOCKS5 transport injection we built for adtler — two CF apps instead of one.
+Claude's remote MCP support (where Anthropic's infra calls the MCP server) would need SAP to be publicly reachable, which rules it out for on-premise systems.
 
-Three options were evaluated (see [issue #7](../../issues/7) for the full analysis):
+Direct wiring keeps everything in a single CF app with BTP auth fully wired.
+See [issue #7](../../issues/7) for the full trade-off analysis.
 
-**Option A — Direct ADT wiring (current).**
-The Go service calls SAP via adtler, routing through BTP's SOCKS5 Connectivity proxy.
-Single deployment unit, BTP auth fully wired, tool calls are in-process function calls.
-This is what we built.
-
-**Option B — mcp-server-abap as a BTP CF sidecar.**
-mcp-server-abap is designed as a trusted local stdio process — it has no built-in network auth.
-Exposing it as a CF app requires adding an auth layer.
-More critically, BTP's Cloud Connector transport (the SOCKS5 proxy + `Proxy-Authorization` dance) is not built into mcp-server-abap.
-Bridging it would require the same custom transport injection we did for adtler (see [adtler PR #61](https://github.com/Hochfrequenz/adtler/pull/61)), but for a separate service — two CF apps to deploy, monitor, and scale.
-
-**Option C — Claude's remote MCP support.**
-Claude API supports MCP servers via `mcp_servers`, where Anthropic's infrastructure calls the MCP server directly.
-This requires a publicly reachable HTTPS endpoint for the MCP server — which means SAP must be reachable from the public internet.
-For on-premise SAP behind a Cloud Connector this is a non-starter.
-
-**Revisit if:** the scope grows to write operations (activate, create object) or the SAP system moves to BTP ABAP Environment / S/4HANA Cloud where the Cloud Connector is no longer in the path.
-In that case, Option B or C become viable.
+**Revisit if** the SAP system moves to BTP ABAP Environment or S/4HANA Cloud (no Cloud Connector), or if write operations become in scope.
 
 ## Quick start
 
