@@ -23,6 +23,10 @@ type ADTClient interface {
 	GetVersionHistory(ctx context.Context, objectURI string) ([]adt.VersionInfo, error)
 	WhereUsed(ctx context.Context, objectURI string) ([]adt.ObjectInfo, error)
 	DiffActiveInactive(ctx context.Context, objectURI string) (*adt.DiffResult, error)
+	// RunQuery executes an ADT SQL SELECT and returns the result rows.
+	// Used for preflight checks that the ADT transport-objects endpoint cannot satisfy
+	// (e.g. SYST/CUST transport types that are invisible to GetTransportObjects).
+	RunQuery(ctx context.Context, query string, maxRows int) (*adt.QueryResult, error)
 }
 
 // TRObject is the agent-facing view of a transport request object.
@@ -133,6 +137,16 @@ func (t *Tools) RunATCCheck(ctx context.Context, objectURIs []string, checkVaria
 		return nil, fmt.Errorf("run ATC check: %w", err)
 	}
 	return result, nil
+}
+
+// RunQuery executes an ADT SQL SELECT and returns the result.
+// Used by Preflight to check E071 when the transport-objects endpoint returns nothing.
+func (t *Tools) RunQuery(ctx context.Context, query string, maxRows int) (*adt.QueryResult, error) {
+	res, err := t.client.RunQuery(ctx, query, maxRows)
+	if err != nil {
+		return nil, fmt.Errorf("run query: %w", err)
+	}
+	return res, nil
 }
 
 // FetchClassIncludes returns a map of include name → source for a CLAS URI.

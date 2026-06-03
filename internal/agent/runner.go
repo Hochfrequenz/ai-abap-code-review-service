@@ -74,15 +74,23 @@ func (r *Runner) Preflight(ctx context.Context, trID string) error {
 	if err != nil {
 		return fmt.Errorf("ADT nicht erreichbar — bitte SAP-Verbindung und Cloud-Connector prüfen")
 	}
-	if len(objs) == 0 {
-		return fmt.Errorf("keine Objekte im Transportauftrag %q gefunden — bitte Nummer prüfen", trID)
-	}
 	for _, obj := range objs {
 		if obj.URI != "" {
 			return nil
 		}
 	}
-	return fmt.Errorf("keine prüfbaren Quellobjekte in %q (PROG, CLAS, INTF) — der Transport enthält nur Customizing- oder Dictionary-Objekte ohne Quellcode", trID)
+	// ADT transport-objects endpoint returned nothing. This can mean two things:
+	// (a) the transport genuinely has no objects, or
+	// (b) it is a SYST/CUST-type transport that the endpoint silently omits.
+	// Query E071 to distinguish the two cases.
+	q := fmt.Sprintf("SELECT TRKORR FROM E071 WHERE TRKORR = '%s'", trID)
+	res, err := r.tools.RunQuery(ctx, q, 1)
+	if err != nil || res == nil || len(res.Rows) == 0 {
+		return fmt.Errorf("keine Objekte im Transportauftrag %q gefunden — bitte Nummer prüfen", trID)
+	}
+	// E071 has rows but the ADT endpoint returned nothing: SYST/CUST transport.
+	// The current toolset cannot fetch source from these transports via ADT.
+	return fmt.Errorf("Transportauftrag %q enthält Systemobjekte (SYST/CUST), die über den ADT-Endpunkt nicht abrufbar sind", trID)
 }
 
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
