@@ -220,9 +220,9 @@ func TestGetStatus_UnknownID_Returns404(t *testing.T) {
 func TestGetTransportRequests_ReturnsSortedOptions(t *testing.T) {
 	lister := &fakeTransportRequestLister{
 		requests: []adt.TransportRequest{
-			{Number: "NPLK900001", Description: "Old TR", Owner: "USER1", Status: "D"},
-			{Number: "NPLK900014", Description: "New TR", Owner: "USER2", Status: "D"},
-			{Number: "NPLK900007", Description: "Mid TR", Owner: "USER1", Status: "D"},
+			{Number: "NPLK900001", Description: "Old TR", Owner: "USER1"},
+			{Number: "NPLK900014", Description: "New TR", Owner: "USER2"},
+			{Number: "NPLK900007", Description: "Mid TR", Owner: "USER1"},
 		},
 	}
 	store := newFakeStore("00000000-0000-0000-0000-000000000010")
@@ -254,7 +254,7 @@ func TestGetTransportRequests_ReturnsSortedOptions(t *testing.T) {
 func TestGetTransportRequests_HTMLEscapesSpecialChars(t *testing.T) {
 	lister := &fakeTransportRequestLister{
 		requests: []adt.TransportRequest{
-			{Number: "NPLK900014", Description: `TR & <fix> "bug"`, Owner: `U<S>ER`, Status: "D"},
+			{Number: "NPLK900014", Description: `TR & <fix> "bug"`, Owner: `U<S>ER`},
 		},
 	}
 	store := newFakeStore("00000000-0000-0000-0000-000000000013")

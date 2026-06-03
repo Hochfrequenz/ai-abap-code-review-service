@@ -118,24 +118,16 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// The XSUAA JWT user_name is an email address, not a SAP username — passing
-		// it to SAP CTS returns nothing. Fetch all TRs without user filter and
-		// filter client-side to modifiable ones ("D") only.
-		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "")
+		// The XSUAA JWT user_name is an email, not a SAP username — pass empty user
+		// so SAP CTS returns all users' TRs. Pass status "D" so SAP filters to
+		// modifiable (open) TRs only; adtler's bucket parsing handles the rest.
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
 			// Best-effort: a broken ADT connection must not break the form.
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// Filter client-side: only show modifiable (open) TRs.
-		modifiable := trs[:0]
-		for _, tr := range trs {
-			if tr.Status == "D" {
-				modifiable = append(modifiable, tr)
-			}
-		}
-		trs = modifiable
 		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
 		var b strings.Builder
 		for _, tr := range trs {
