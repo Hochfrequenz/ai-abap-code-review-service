@@ -106,9 +106,42 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 	return "", fmt.Errorf("review did not complete within %d tool-use iterations", reviewMaxToolLoops)
 }
 
+// dispatch routes a tool call by name to the appropriate handler.
+// Adding a new tool: implement a handle* method and register it in toolHandlers.
 func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMessage) (string, error) {
-	switch toolName {
-	case "list_tr_objects":
+	h, ok := r.toolHandlers(ctx)[toolName]
+	if !ok {
+		return "", fmt.Errorf("unknown tool: %s", toolName)
+	}
+	return h(input)
+}
+
+// toolHandlers returns a map of tool name → handler closed over ctx.
+// Each handler unmarshals its specific args, calls the tool, and marshals the result.
+func (r *Runner) toolHandlers(ctx context.Context) map[string]func(json.RawMessage) (string, error) {
+	return map[string]func(json.RawMessage) (string, error){
+		"list_tr_objects":      r.handleListTRObjects(ctx),
+		"fetch_source":         r.handleFetchSource(ctx),
+		"fetch_class_includes": r.handleFetchClassIncludes(ctx),
+		"syntax_check":         r.handleSyntaxCheck(ctx),
+		"get_object_info":      r.handleGetObjectInfo(ctx),
+		"get_version_history":  r.handleGetVersionHistory(ctx),
+		"where_used":           r.handleWhereUsed(ctx),
+		"diff_active_inactive": r.handleDiffActiveInactive(ctx),
+		"run_atc_check":        r.handleRunATCCheck(ctx),
+	}
+}
+
+func marshalResult(v any) (string, error) {
+	out, err := json.Marshal(v)
+	if err != nil {
+		return "", fmt.Errorf("marshal tool result: %w", err)
+	}
+	return string(out), nil
+}
+
+func (r *Runner) handleListTRObjects(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			TransportRequestID string `json:"transport_request_id"`
 		}
@@ -119,13 +152,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(objs)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(objs)
+	}
+}
 
-	case "fetch_source":
+func (r *Runner) handleFetchSource(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -133,8 +165,11 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 			return "", err
 		}
 		return r.tools.FetchSource(ctx, args.ObjectURI)
+	}
+}
 
-	case "fetch_class_includes":
+func (r *Runner) handleFetchClassIncludes(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ClassURI string `json:"class_uri"`
 		}
@@ -145,13 +180,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(includes)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(includes)
+	}
+}
 
-	case "syntax_check":
+func (r *Runner) handleSyntaxCheck(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -162,13 +196,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(msgs)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(msgs)
+	}
+}
 
-	case "get_object_info":
+func (r *Runner) handleGetObjectInfo(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -179,13 +212,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(info)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(info)
+	}
+}
 
-	case "get_version_history":
+func (r *Runner) handleGetVersionHistory(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -196,13 +228,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(hist)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(hist)
+	}
+}
 
-	case "where_used":
+func (r *Runner) handleWhereUsed(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -213,13 +244,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(callers)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(callers)
+	}
+}
 
-	case "diff_active_inactive":
+func (r *Runner) handleDiffActiveInactive(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -230,13 +260,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(diff)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(diff)
+	}
+}
 
-	case "run_atc_check":
+func (r *Runner) handleRunATCCheck(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURIs   []string `json:"object_uris"`
 			CheckVariant string   `json:"check_variant"`
@@ -251,14 +280,7 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(result)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
-
-	default:
-		return "", fmt.Errorf("unknown tool: %s", toolName)
+		return marshalResult(result)
 	}
 }
 
