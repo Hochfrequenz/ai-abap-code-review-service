@@ -22,6 +22,34 @@ flowchart LR
     end
 ```
 
+## Why direct ADT wiring instead of mcp-server-abap
+
+[mcp-server-abap](https://github.com/Hochfrequenz/mcp-server-abap) is a production-quality MCP server that exposes ~50 SAP ADT tools and is also maintained by Hochfrequenz.
+The obvious question is: why not use it here instead of implementing ADT calls directly?
+
+**The short answer:** the BTP Cloud Connector makes it impractical.
+
+Three options were evaluated (see [issue #7](../../issues/7) for the full analysis):
+
+**Option A — Direct ADT wiring (current).**
+The Go service calls SAP via adtler, routing through BTP's SOCKS5 Connectivity proxy.
+Single deployment unit, BTP auth fully wired, tool calls are in-process function calls.
+This is what we built.
+
+**Option B — mcp-server-abap as a BTP CF sidecar.**
+mcp-server-abap is designed as a trusted local stdio process — it has no built-in network auth.
+Exposing it as a CF app requires adding an auth layer.
+More critically, BTP's Cloud Connector transport (the SOCKS5 proxy + `Proxy-Authorization` dance) is not built into mcp-server-abap.
+Bridging it would require the same custom transport injection we did for adtler (see [adtler PR #61](https://github.com/Hochfrequenz/adtler/pull/61)), but for a separate service — two CF apps to deploy, monitor, and scale.
+
+**Option C — Claude's remote MCP support.**
+Claude API supports MCP servers via `mcp_servers`, where Anthropic's infrastructure calls the MCP server directly.
+This requires a publicly reachable HTTPS endpoint for the MCP server — which means SAP must be reachable from the public internet.
+For on-premise SAP behind a Cloud Connector this is a non-starter.
+
+**Revisit if:** the scope grows to write operations (activate, create object) or the SAP system moves to BTP ABAP Environment / S/4HANA Cloud where the Cloud Connector is no longer in the path.
+In that case, Option B or C become viable.
+
 ## Quick start
 
 1. **If deploying your own instance:** fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run `go run ./cmd/apply-config` — see [#2](../../issues/2) for the full field list
