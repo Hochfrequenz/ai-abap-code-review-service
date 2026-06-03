@@ -49,7 +49,7 @@ func TestRunner_UsesSpecifiedModel(t *testing.T) {
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
 	runner := agent.NewRunner(tools, claudeClient)
 
-	_, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6))
+	_, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6), "review_pedantic")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	)
 
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
+	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestRunner_DispatchTools(t *testing.T) {
 			tools := agent.NewTools(fake)
 			claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 			runner := agent.NewRunner(tools, claudeClient)
-			result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
+			result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
@@ -221,7 +221,7 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
+	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err != nil {
 		t.Fatalf("expected partial result not error, got: %v", err)
 	}
@@ -247,8 +247,64 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	_, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
+	_, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err == nil {
 		t.Error("expected error for unexpected stop reason")
+	}
+}
+
+func TestAllowedPrompts_HasExpectedKeys(t *testing.T) {
+	prompts := agent.AllowedPrompts()
+	keys := []string{"review_pedantic", "review_appreciative", "review_analytical", "review_guidelines_hf"}
+	for _, k := range keys {
+		p, ok := prompts[k]
+		if !ok {
+			t.Errorf("AllowedPrompts must contain key %q", k)
+			continue
+		}
+		if p.Label == "" {
+			t.Errorf("AllowedPrompts[%q].Label must not be empty", k)
+		}
+		if p.Text == "" {
+			t.Errorf("AllowedPrompts[%q].Text must not be empty", k)
+		}
+	}
+}
+
+func TestRunner_UsesSpecifiedPrompt(t *testing.T) {
+	var capturedSystemPrompt string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if sys, ok := body["system"].([]any); ok && len(sys) > 0 {
+			if block, ok := sys[0].(map[string]any); ok {
+				if text, ok := block["text"].(string); ok {
+					capturedSystemPrompt = text
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": string(anthropic.ModelClaudeOpus4_8), "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeOpus4_8), "review_analytical")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	want := agent.AllowedPrompts()["review_analytical"].Text
+	if capturedSystemPrompt != want {
+		// min() is a builtin in Go 1.21+ (this module uses go 1.26)
+		t.Errorf("wrong system prompt sent to Claude API\ngot:  %q\nwant: %q", capturedSystemPrompt[:min(80, len(capturedSystemPrompt))], want[:min(80, len(want))])
 	}
 }
