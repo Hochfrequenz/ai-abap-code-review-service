@@ -140,7 +140,10 @@ The first option (`review_pedantic`) is pre-selected.
 ### `internal/agent/runner_test.go`
 
 - `TestAllowedPrompts_HasExpectedKeys` — asserts all 4 keys are present and each has non-empty `Label` and `Text`.
-- `TestRunner_UsesSpecifiedPrompt` — stub server captures the system prompt field in the request body; asserts it equals `AllowedPrompts()["review_analytical"].Text`. Mirrors `TestRunner_UsesSpecifiedModel`.
+- `TestRunner_UsesSpecifiedPrompt` — stub server captures the system prompt from the request body (`body["system"].([]any)[0].(map[string]any)["text"].(string)`); asserts it equals `AllowedPrompts()["review_analytical"].Text`. Mirrors `TestRunner_UsesSpecifiedModel`.
+
+All existing `runner.Run(ctx, trID, model)` calls in this file must be updated to the new 4-parameter signature by adding a `promptKey` argument — use any valid key, e.g. `"review_pedantic"`.
+Affected tests: `TestRunner_UsesSpecifiedModel`, `TestRunner_ToolLoopAndFinalText`, `TestRunner_DispatchTools`, `TestRunner_MaxTokens_ReturnsTruncatedReview`, `TestRunner_UnexpectedStopReason_ReturnsError`.
 
 ### `internal/ui/templates_test.go`
 
