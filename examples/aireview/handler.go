@@ -11,7 +11,6 @@ import (
 
 	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
@@ -119,25 +118,24 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// Use the authenticated user's SAP username from the JWT so SAP CTS returns
-		// that user's transport requests. The BTP Destination technical user has no
-		// development TRs, so an empty user filter would always yield an empty list.
-		var sapUser string
-		if claims, ok := c.Get("jwtClaims"); ok {
-			if m, ok := claims.(jwt.MapClaims); ok {
-				sapUser, _ = m["user_name"].(string)
-			}
-		}
-		// Temporary debug log — remove after confirming the correct user_name format.
-		slog.InfoContext(c.Request.Context(), "transport-requests user filter", "user", sapUser)
-		// "D" = modifiable (open) requests only; "L" = released.
-		trs, err := lister.GetTransportRequests(c.Request.Context(), sapUser, "D")
+		// The XSUAA JWT user_name is an email address, not a SAP username — passing
+		// it to SAP CTS returns nothing. Fetch all TRs without user filter and
+		// filter client-side to modifiable ones ("D") only.
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "")
 		if err != nil {
 			// Best-effort: a broken ADT connection must not break the form.
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
+		// Filter client-side: only show modifiable (open) TRs.
+		modifiable := trs[:0]
+		for _, tr := range trs {
+			if tr.Status == "D" {
+				modifiable = append(modifiable, tr)
+			}
+		}
+		trs = modifiable
 		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
 		var b strings.Builder
 		for _, tr := range trs {
