@@ -68,7 +68,7 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 
 | | URL |
 |---|---|
-| **Web UI** (XSUAA login required) | [ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com](https://ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com/) |
+| **Web UI** (XSUAA login required) | [ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com](https://ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com/) — on the login page, choose **Default Identity Provider** |
 | Health | [/healthz](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/healthz) |
 | Version | [/version](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version) |
 
