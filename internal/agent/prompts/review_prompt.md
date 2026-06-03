@@ -48,7 +48,7 @@ SAP-ATC-Befunde nach Objekt und Schweregrad ("1"=Fehler, "2"=Warnung, "3"=Info).
 
 ### <Objektname> (<Typ>)
 
-**[Schweregrad: Kritisch/Mittel/Gering]** Kurzer Titel
+**[Schweregrad: Kritisch/Schwerwiegend/Gering]** Kurzer Titel
 Beschreibung und Empfehlung.
 
 ## Gesamtbewertung
