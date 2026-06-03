@@ -73,19 +73,6 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 | Token budget | `reviewMaxTokens` constant in `internal/agent/runner.go` |
 | Persistence (swap in-memory store) | implement `reviewstore.JobStore` in `internal/reviewstore/store.go` |
 
-## Open issues / setup required
-
-The following GitHub issues track one-time setup tasks required before the service is usable:
-
-- [#1 Set ANTHROPIC_API_KEY in CF environment](../../issues/1)
-- [#2 Configure config.yml with your SAP destination, client, and fork settings](../../issues/2)
-- [#3 Customize the ABAP review prompt for your organisation](../../issues/3)
-- [#4 Full deployment checklist (ordered, with verification steps)](../../issues/4)
-
 ## License
 
 MIT, see [LICENSE](LICENSE).
-
----
-
-Built on [go-sap-btp-cf-template](https://github.com/Hochfrequenz/go-sap-btp-cf-template) — for BTP deployment, forking, XSUAA auth, Cloud Connector wiring, and everything else about the plumbing, see the template README.
