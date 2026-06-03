@@ -106,9 +106,42 @@ func (r *Runner) Run(ctx context.Context, trID string) (string, error) {
 	return "", fmt.Errorf("review did not complete within %d tool-use iterations", reviewMaxToolLoops)
 }
 
+// dispatch routes a tool call by name to the appropriate handler.
+// Adding a new tool: implement a handle* method and register it in toolHandlers.
 func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMessage) (string, error) {
-	switch toolName {
-	case "list_tr_objects":
+	h, ok := r.toolHandlers(ctx)[toolName]
+	if !ok {
+		return "", fmt.Errorf("unknown tool: %s", toolName)
+	}
+	return h(input)
+}
+
+// toolHandlers returns a map of tool name → handler closed over ctx.
+// Each handler unmarshals its specific args, calls the tool, and marshals the result.
+func (r *Runner) toolHandlers(ctx context.Context) map[string]func(json.RawMessage) (string, error) {
+	return map[string]func(json.RawMessage) (string, error){
+		"list_tr_objects":      r.handleListTRObjects(ctx),
+		"fetch_source":         r.handleFetchSource(ctx),
+		"fetch_class_includes": r.handleFetchClassIncludes(ctx),
+		"syntax_check":         r.handleSyntaxCheck(ctx),
+		"get_object_info":      r.handleGetObjectInfo(ctx),
+		"get_version_history":  r.handleGetVersionHistory(ctx),
+		"where_used":           r.handleWhereUsed(ctx),
+		"diff_active_inactive": r.handleDiffActiveInactive(ctx),
+		"run_atc_check":        r.handleRunATCCheck(ctx),
+	}
+}
+
+func marshalResult(v any) (string, error) {
+	out, err := json.Marshal(v)
+	if err != nil {
+		return "", fmt.Errorf("marshal tool result: %w", err)
+	}
+	return string(out), nil
+}
+
+func (r *Runner) handleListTRObjects(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			TransportRequestID string `json:"transport_request_id"`
 		}
@@ -119,13 +152,12 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(objs)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(objs)
+	}
+}
 
-	case "fetch_source":
+func (r *Runner) handleFetchSource(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ObjectURI string `json:"object_uri"`
 		}
@@ -133,8 +165,11 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 			return "", err
 		}
 		return r.tools.FetchSource(ctx, args.ObjectURI)
+	}
+}
 
-	case "fetch_class_includes":
+func (r *Runner) handleFetchClassIncludes(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
 		var args struct {
 			ClassURI string `json:"class_uri"`
 		}
@@ -145,14 +180,107 @@ func (r *Runner) dispatch(ctx context.Context, toolName string, input json.RawMe
 		if err != nil {
 			return "", err
 		}
-		out, err := json.Marshal(includes)
-		if err != nil {
-			return "", fmt.Errorf("marshal tool result: %w", err)
-		}
-		return string(out), nil
+		return marshalResult(includes)
+	}
+}
 
-	default:
-		return "", fmt.Errorf("unknown tool: %s", toolName)
+func (r *Runner) handleSyntaxCheck(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
+		var args struct {
+			ObjectURI string `json:"object_uri"`
+		}
+		if err := json.Unmarshal(input, &args); err != nil {
+			return "", err
+		}
+		msgs, err := r.tools.SyntaxCheck(ctx, args.ObjectURI)
+		if err != nil {
+			return "", err
+		}
+		return marshalResult(msgs)
+	}
+}
+
+func (r *Runner) handleGetObjectInfo(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
+		var args struct {
+			ObjectURI string `json:"object_uri"`
+		}
+		if err := json.Unmarshal(input, &args); err != nil {
+			return "", err
+		}
+		info, err := r.tools.GetObjectInfo(ctx, args.ObjectURI)
+		if err != nil {
+			return "", err
+		}
+		return marshalResult(info)
+	}
+}
+
+func (r *Runner) handleGetVersionHistory(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
+		var args struct {
+			ObjectURI string `json:"object_uri"`
+		}
+		if err := json.Unmarshal(input, &args); err != nil {
+			return "", err
+		}
+		hist, err := r.tools.GetVersionHistory(ctx, args.ObjectURI)
+		if err != nil {
+			return "", err
+		}
+		return marshalResult(hist)
+	}
+}
+
+func (r *Runner) handleWhereUsed(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
+		var args struct {
+			ObjectURI string `json:"object_uri"`
+		}
+		if err := json.Unmarshal(input, &args); err != nil {
+			return "", err
+		}
+		callers, err := r.tools.WhereUsed(ctx, args.ObjectURI)
+		if err != nil {
+			return "", err
+		}
+		return marshalResult(callers)
+	}
+}
+
+func (r *Runner) handleDiffActiveInactive(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
+		var args struct {
+			ObjectURI string `json:"object_uri"`
+		}
+		if err := json.Unmarshal(input, &args); err != nil {
+			return "", err
+		}
+		diff, err := r.tools.DiffActiveInactive(ctx, args.ObjectURI)
+		if err != nil {
+			return "", err
+		}
+		return marshalResult(diff)
+	}
+}
+
+func (r *Runner) handleRunATCCheck(ctx context.Context) func(json.RawMessage) (string, error) {
+	return func(input json.RawMessage) (string, error) {
+		var args struct {
+			ObjectURIs   []string `json:"object_uris"`
+			CheckVariant string   `json:"check_variant"`
+		}
+		if err := json.Unmarshal(input, &args); err != nil {
+			return "", err
+		}
+		if len(args.ObjectURIs) == 0 {
+			return "[]", nil // nothing to check
+		}
+		result, err := r.tools.RunATCCheck(ctx, args.ObjectURIs, args.CheckVariant)
+		if err != nil {
+			return "", err
+		}
+		return marshalResult(result)
 	}
 }
 
@@ -191,6 +319,79 @@ func (r *Runner) buildToolDefs() []anthropic.ToolUnionParam {
 						"class_uri": map[string]any{"type": "string", "description": "The ADT URI of the class, e.g. /sap/bc/adt/oo/classes/zcl_example"},
 					},
 					Required: []string{"class_uri"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "syntax_check",
+				Description: anthropic.String("Run an ADT syntax check on a saved ABAP object. Returns a list of syntax errors, warnings, and info messages with line/column positions. An empty list means no issues."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"object_uri": map[string]any{"type": "string", "description": "ADT URI of the object to check"},
+					},
+					Required: []string{"object_uri"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "get_object_info",
+				Description: anthropic.String("Get metadata for an ABAP object: type, name, description, and package. Useful for understanding what an object is before reading its source."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"object_uri": map[string]any{"type": "string", "description": "ADT URI of the object"},
+					},
+					Required: []string{"object_uri"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "get_version_history",
+				Description: anthropic.String("Get the version history of an ABAP object: who changed it, when, and in which transport. Provides context for the code review (e.g. recent churn, author patterns)."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"object_uri": map[string]any{"type": "string", "description": "ADT URI of the object"},
+					},
+					Required: []string{"object_uri"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "where_used",
+				Description: anthropic.String("Find all ABAP objects that reference the given object (callers, users). Useful for impact analysis: understanding how many callers depend on a changed interface or class."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"object_uri": map[string]any{"type": "string", "description": "ADT URI of the object to analyse"},
+					},
+					Required: []string{"object_uri"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "diff_active_inactive",
+				Description: anthropic.String("Show the diff between the active (released) version and the inactive (pending/unsaved) version of an ABAP object. HasChanges=false means the object has no pending edits. Use this to focus the review on what actually changed."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"object_uri": map[string]any{"type": "string", "description": "ADT URI of the object"},
+					},
+					Required: []string{"object_uri"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "run_atc_check",
+				Description: anthropic.String("Run SAP's ATC (ABAP Test Cockpit) static analysis on one or more objects. Returns prioritised findings (priority field: \"1\"=error, \"2\"=warning, \"3\"=info — string values, not integers) with check name and message. This is SAP's own quality gate — use it on all objects in the transport before writing the review."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"object_uris":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "List of ADT URIs to check (PROG/CLAS/INTF only; skip empty URIs)"},
+						"check_variant": map[string]any{"type": "string", "description": "ATC check variant name; pass empty string to use the system default"},
+					},
+					Required: []string{"object_uris", "check_variant"},
 				},
 			},
 		},
