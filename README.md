@@ -87,8 +87,8 @@ To see which user that is:
 > BTP cockpit → **Connectivity → Destinations → HF_S4** → Authentication section → **User** field
 
 Currently: **`metzej`**.
-The technical user must have `SAP_BC_TRANSPORT_ADMINISTRATOR` in SAP (SU01 → Roles tab) to list transport requests via ADT.
-Without it, all TR-listing calls return an empty response with HTTP 200 — no error, just no data.
+The technical user should have `SAP_BC_TRANSPORT_ADMINISTRATOR` in SAP (SU01 → Roles tab) for general CTS access via ADT.
+However, adding this role alone does **not** fix the empty TR list — see the KORRDEV note below for the real root cause.
 
 ### XSUAA login: choose Default Identity Provider
 
@@ -109,7 +109,7 @@ See [adtler issue #63](https://github.com/Hochfrequenz/adtler/issues/63) for the
 ### `/healthz` returns 503 when `ANTHROPIC_API_KEY` is missing
 
 The health endpoint checks for required env vars at runtime.
-If the key is missing it returns `503 {"status":"unhealthy","missing":["ANTHROPIC_API_KEY"]}` — this is intentional.
+If the key is missing it returns `503 {"error":{"code":"internal","message":"server misconfigured: missing required environment variables: ANTHROPIC_API_KEY"}}` — this is intentional.
 Set the key via `cf set-env ai-abap-code-review-service ANTHROPIC_API_KEY sk-ant-...` then `cf restage`.
 
 ### JWT `user_name` is an email, not a SAP username
