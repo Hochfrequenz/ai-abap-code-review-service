@@ -118,11 +118,14 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// Empty user = all users' TRs; status "D" = modifiable (open) only.
-		// adtler v0.2.2 handles both legacy NW and modern S/4HANA XML formats.
+		// DEBUG rc10: return hardcoded option to test if HTMX datalist works at all.
+		// If this shows in the browser dropdown, the issue is backend (SAP auth/XML).
+		// If it doesn't show, the issue is frontend (HTMX/datalist).
+		c.Data(http.StatusOK, contentTypeHTML, []byte(`<option value="TESTK900001">TESTK900001 — Hardcoded Test TR (TestUser)</option>`))
+		return
+		// nolint:govet — unreachable code intentional for debug
 		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
-			// Best-effort: a broken ADT connection must not break the form.
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
