@@ -118,12 +118,13 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// DEBUG rc10: return hardcoded option to test if HTMX datalist works at all.
-		// If this shows in the browser dropdown, the issue is backend (SAP auth/XML).
-		// If it doesn't show, the issue is frontend (HTMX/datalist).
-		c.Data(http.StatusOK, contentTypeHTML, []byte(`<option value="TESTK900001">TESTK900001 — Hardcoded Test TR (TestUser)</option>`))
-		return
-		// nolint:govet — unreachable code intentional for debug
+		// DEBUG: inject one hardcoded option to verify HTMX/datalist works in browser.
+		// Remove once frontend is confirmed working.
+		const debugHardcoded = true
+		if debugHardcoded {
+			c.Data(http.StatusOK, contentTypeHTML, []byte(`<option value="TESTK900001">TESTK900001 — Hardcoded Test TR (TestUser)</option>`))
+			return
+		}
 		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
