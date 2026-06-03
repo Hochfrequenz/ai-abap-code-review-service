@@ -118,13 +118,10 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		// DEBUG: inject one hardcoded option to verify HTMX/datalist works in browser.
-		// Remove once frontend is confirmed working.
-		const debugHardcoded = true
-		if debugHardcoded {
-			c.Data(http.StatusOK, contentTypeHTML, []byte(`<option value="TESTK900001">TESTK900001 — Hardcoded Test TR (TestUser)</option>`))
-			return
-		}
+		// Empty user = all users' open TRs ("D" = modifiable/open only).
+		// Implementation uses RunQuery on E070/E07T instead of the ADT transport
+		// organizer tree endpoint: the HF S/4 system uses KORRDEV="SYST"/"CUST"
+		// for its requests, which the organizer tree ignores (it only handles "K").
 		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
