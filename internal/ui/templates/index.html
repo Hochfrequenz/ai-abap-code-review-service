@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABAP Code Review</title>
+  <title>ABAP Code-Review</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Yanone+Kaffeesatz:wght@400;600&family=Roboto+Condensed:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
@@ -75,13 +75,13 @@
   </style>
 </head>
 <body>
-  <h1>ABAP Code Review</h1>
+  <h1>ABAP Code-Review</h1>
   <form hx-post="/api/reviews"
         hx-target="#result"
         hx-swap="innerHTML">
-    <label for="tr">Transport Request ID</label>
+    <label for="tr">Transportauftragsnummer</label>
     <input id="tr" name="transport_request_id" placeholder="NPLK900014" required>
-    <button type="submit">Request Review</button>
+    <button type="submit">Review anfordern</button>
   </form>
   <div id="result"></div>
 </body>

@@ -63,8 +63,8 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 		}(context.WithoutCancel(rootCtx), job.ID, job.TRID)
 
 		fragment := fmt.Sprintf(
-			`<p>Review started — <a href="/reviews/%s">view results</a></p>`+
-				`<div hx-get="/api/reviews/%s/status" hx-trigger="every 3s" hx-swap="outerHTML">⏳ Starting…</div>`,
+			`<p>Review gestartet — <a href="/reviews/%s">Ergebnisse anzeigen</a></p>`+
+				`<div hx-get="/api/reviews/%s/status" hx-trigger="every 3s" hx-swap="outerHTML">⏳ Wird gestartet…</div>`,
 			job.ID, job.ID,
 		)
 		c.Data(http.StatusOK, contentTypeHTML, []byte(fragment))
