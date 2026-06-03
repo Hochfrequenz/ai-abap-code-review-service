@@ -268,3 +268,20 @@ func TestGetTransportRequests_ADTError_ReturnsEmpty(t *testing.T) {
 		t.Errorf("expected empty body on ADT error, got: %s", w.Body.String())
 	}
 }
+
+func TestGetTransportRequests_NilLister_ReturnsEmpty(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000012")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouterWithLister(store, &fakeRunner{}, nil, tmpl)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/transport-requests", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("nil lister must return 200, got %d", w.Code)
+	}
+	if w.Body.String() != "" {
+		t.Errorf("nil lister must return empty body, got: %s", w.Body.String())
+	}
+}

@@ -3,6 +3,7 @@ package aireview
 import (
 	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -117,6 +118,7 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
+		// "D" = modifiable (open) requests only; "L" = released.
 		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
 		if err != nil {
 			// Best-effort: a broken ADT connection must not break the form.
@@ -124,11 +126,14 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
-		sort.Slice(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
+		sort.SliceStable(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
 		var b strings.Builder
 		for _, tr := range trs {
 			fmt.Fprintf(&b, "<option value=%q>%s — %s (%s)</option>\n",
-				tr.Number, tr.Number, tr.Description, tr.Owner)
+				html.EscapeString(tr.Number),
+				html.EscapeString(tr.Number),
+				html.EscapeString(tr.Description),
+				html.EscapeString(tr.Owner))
 		}
 		c.Data(http.StatusOK, contentTypeHTML, []byte(b.String()))
 	}

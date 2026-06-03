@@ -265,6 +265,7 @@ func buildRouter(
 	})
 
 	// HTMX API routes (JWT-gated via the api group)
+	// TODO: pass adtClient as TransportRequestLister once Task 2 wires production lister
 	aireview.Register(api, rootCtx, store, runner, nil, tmpl)
 
 	return r
