@@ -445,7 +445,7 @@ func (r *Runner) buildToolDefs() []anthropic.ToolUnionParam {
 				Description: anthropic.String("Run SAP's ATC (ABAP Test Cockpit) static analysis on one or more objects. Returns prioritised findings (priority field: \"1\"=error, \"2\"=warning, \"3\"=info — string values, not integers) with check name and message. This is SAP's own quality gate — use it on all objects in the transport before writing the review."),
 				InputSchema: anthropic.ToolInputSchemaParam{
 					Properties: map[string]any{
-						"object_uris":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "List of ADT URIs to check (PROG/CLAS/INTF/DDLS/DDLX/DCLS only; skip empty URIs)"},
+						"object_uris":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "List of ADT URIs to check (PROG/CLAS/INTF/FUGR/TABL/DDLS/DDLX/DCLS only; skip empty URIs)"},
 						"check_variant": map[string]any{"type": "string", "description": "ATC check variant name; pass empty string to use the system default"},
 					},
 					Required: []string{"object_uris", "check_variant"},

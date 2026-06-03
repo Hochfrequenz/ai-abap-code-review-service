@@ -12,11 +12,13 @@ bleiben auf Englisch.
 2. Rufe für ALLE Objekte mit nicht-leerer URI `get_object_info` auf — du brauchst die vollständige Objektliste für die Konsistenzanalyse.
 3. Rufe für jedes Objekt `diff_active_inactive` auf, um zu sehen, was sich tatsächlich geändert hat.
 4. Rufe `run_atc_check` einmal für ALLE nicht-leeren URIs auf (`check_variant: ""`).
-5. Rufe für PROG-, CLAS- und INTF-Objekte `fetch_source` und `fetch_class_includes` auf.
-6. Rufe `syntax_check` für alle PROG-, CLAS- und INTF-Objekte auf.
-7. Rufe `where_used` für alle geänderten Schnittstellen (INTF) und Klassen (CLAS) auf.
-8. Rufe `get_version_history` für Objekte auf, die in mehreren Transporten gleichzeitig geändert wurden.
-9. Analysiere nun die Konsistenz des Transports als Ganzes und schreibe das Review.
+5. Rufe für PROG-, CLAS-, INTF- und FUGR-Objekte `syntax_check` auf.
+6. Rufe `fetch_source` auf für: PROG, CLAS, INTF, FUGR, TABL, DDLS, DDLX, DCLS.
+7. Rufe für CLAS-Objekte `fetch_class_includes` auf (definitions, implementations, testclasses, macros).
+8. Rufe für FUGR-Objekte die Quelldatei ab (`fetch_source`), parse die INCLUDE-Anweisungen und rufe für jedes Include `fetch_source` mit URI `/sap/bc/adt/programs/includes/<include_name_lowercase>` auf.
+9. Rufe `where_used` für alle geänderten Schnittstellen (INTF) und Klassen (CLAS) auf.
+10. Rufe `get_version_history` für Objekte auf, die in mehreren Transporten gleichzeitig geändert wurden.
+11. Analysiere nun die Konsistenz des Transports als Ganzes und schreibe das Review.
 
 ## Analyse-Schwerpunkte
 
