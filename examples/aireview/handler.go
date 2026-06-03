@@ -38,8 +38,8 @@ type reviewRequest struct {
 	// form tag covers HTMX's default application/x-www-form-urlencoded submissions;
 	// json tag covers direct API calls with Content-Type: application/json.
 	TransportRequestID string `json:"transport_request_id" form:"transport_request_id" binding:"required,uppercase,min=9,max=10"`
-	// Model is an optional Claude model ID from agent.AllowedModels().
-	// Defaults to Opus 4.8 when empty or invalid.
+	// Model is a required Claude model ID from agent.AllowedModels().
+	// The form <select> always submits a value; direct API calls must supply one.
 	Model string `json:"model" form:"model"`
 }
 
@@ -65,13 +65,12 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 			return
 		}
 
-		// Validate model — must be in the allowlist or empty (defaults to Opus 4.8).
-		if req.Model != "" {
-			if _, ok := agent.AllowedModels()[req.Model]; !ok {
-				btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
-					fmt.Sprintf("unbekanntes Modell %q — erlaubt: %s", req.Model, allowedModelKeys()), nil)
-				return
-			}
+		// Model is required — must be a key from agent.AllowedModels().
+		// No silent defaulting: the form always submits a value via the <select>.
+		if _, ok := agent.AllowedModels()[req.Model]; !ok {
+			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
+				fmt.Sprintf("Modell fehlt oder unbekannt %q — erlaubt: %s", req.Model, allowedModelKeys()), nil)
+			return
 		}
 
 		job, err := store.Create(c.Request.Context(), req.TransportRequestID)

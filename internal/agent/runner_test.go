@@ -115,7 +115,7 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	)
 
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014", "")
+	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestRunner_DispatchTools(t *testing.T) {
 			tools := agent.NewTools(fake)
 			claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 			runner := agent.NewRunner(tools, claudeClient)
-			result, err := runner.Run(context.Background(), "NPLK900014", "")
+			result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
@@ -221,7 +221,7 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014", "")
+	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 	if err != nil {
 		t.Fatalf("expected partial result not error, got: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	_, err := runner.Run(context.Background(), "NPLK900014", "")
+	_, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8")
 	if err == nil {
 		t.Error("expected error for unexpected stop reason")
 	}
