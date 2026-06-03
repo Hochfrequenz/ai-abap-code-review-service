@@ -72,7 +72,8 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 | Health | [/healthz](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/healthz) |
 | Version | [/version](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version) |
 
-CI/CD: pushes to `main` are deployed automatically via `.github/workflows/deploy.yml` to the `dev` space in the `HF Dev Account_hf-cf` org on `eu10`.
+CI/CD: deployment is triggered by **publishing a GitHub Release** — not by push to `main`.
+The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` space in `HF Dev Account_hf-cf` on `eu10`, and smoke-tests `/healthz` and `/version`.
 
 ## Customisation
 
