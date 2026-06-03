@@ -68,9 +68,9 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 
 | | URL |
 |---|---|
-| **Web UI** (XSUAA login required) | https://ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com/ |
-| Health | https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/healthz |
-| Version | https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version |
+| **Web UI** (XSUAA login required) | [ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com](https://ai-abap-code-review-service-web.cfapps.eu10.hana.ondemand.com/) |
+| Health | [/healthz](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/healthz) |
+| Version | [/version](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version) |
 
 CI/CD: pushes to `main` are deployed automatically via `.github/workflows/deploy.yml` to the `dev` space in the `HF Dev Account_hf-cf` org on `eu10`.
 
