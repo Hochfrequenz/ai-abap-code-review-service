@@ -12,11 +12,12 @@ bleiben auf Englisch.
 2. Rufe für jedes Objekt mit nicht-leerer URI `get_object_info` auf.
 3. Rufe für jedes Objekt mit nicht-leerer URI `diff_active_inactive` auf.
 4. Rufe `run_atc_check` einmal für ALLE nicht-leeren URIs auf (`check_variant: ""`).
-5. Rufe für jedes PROG-, CLAS- und INTF-Objekt `syntax_check` auf.
-6. Rufe für PROG-, CLAS- und INTF-Objekte `fetch_source` auf.
+5. Rufe für PROG-, CLAS-, INTF- und FUGR-Objekte `syntax_check` auf.
+6. Rufe `fetch_source` auf für: PROG, CLAS, INTF, FUGR, TABL, DDLS, DDLX, DCLS.
 7. Rufe für CLAS-Objekte `fetch_class_includes` auf (definitions, implementations, testclasses, macros).
-8. Rufe `where_used` auf bei Objekten mit vielen möglichen Aufrufern.
-9. Schreibe nach dem Sammeln aller Informationen ein wertschätzendes Review.
+8. Rufe für FUGR-Objekte die INCLUDE-Anweisungen aus dem bereits abgerufenen Quelltext heraus und rufe für jedes Include `fetch_source` mit URI `/sap/bc/adt/programs/includes/<include_name_lowercase>` auf.
+9. Rufe `where_used` auf bei Objekten mit vielen möglichen Aufrufern.
+10. Schreibe nach dem Sammeln aller Informationen ein wertschätzendes Review.
 
 ## Review-Kriterien (Fokus auf die wichtigsten Punkte)
 
