@@ -16,6 +16,7 @@ func TestObjectURI_KnownTypes(t *testing.T) {
 		{adt.TransportObject{Type: "CLAS", Name: "ZCL_EXAMPLE"}, "/sap/bc/adt/oo/classes/zcl_example"},
 		{adt.TransportObject{Type: "INTF", Name: "ZIF_EXAMPLE"}, "/sap/bc/adt/oo/interfaces/zif_example"},
 		{adt.TransportObject{Type: "FUGR", Name: "ZFUGR"}, "/sap/bc/adt/functions/groups/zfugr"},
+		{adt.TransportObject{Type: "FUGR", Name: "/HFQ/ZFUGR"}, "/sap/bc/adt/functions/groups//hfq/zfugr"},
 		{adt.TransportObject{Type: "TABL", Name: "ZTABLE"}, "/sap/bc/adt/ddic/tables/ztable"},
 		{adt.TransportObject{Type: "TABL", Name: "/HFQ/ZTABLE"}, "/sap/bc/adt/ddic/tables//hfq/ztable"},
 		{adt.TransportObject{Type: "DDLS", Name: "ZV_EXAMPLE"}, "/sap/bc/adt/ddic/ddl/sources/zv_example"},

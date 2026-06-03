@@ -14,7 +14,6 @@ import (
 // for follow-up work on MSAG, BDEF, SRVD, SRVB, ENHO.
 //
 // Excluded with a reason:
-//   - FUGR: adtler has no include-discovery API for function groups
 //   - DTEL, DOMA, VIEW, TTYP: no /source/main ADT endpoint (metadata-only in ADT)
 //   - BDEF, SRVD, SRVB, ENHO: /source/main not available on this system; correct path unknown
 //   - MSAG: needs a dedicated GetMessageClass call, not /source/main
