@@ -121,24 +121,39 @@ jobs:
         run: |
           cf push "$BACKEND_HOST" -f manifest.yml --vars-file vars.yml
 
+      - name: Set ANTHROPIC_API_KEY on backend
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY secret not set — /healthz will return 503 until it is configured via cf set-env"
+          else
+            cf set-env "$BACKEND_HOST" ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+            cf restage "$BACKEND_HOST"
+          fi
+
       - name: cf push — approuter (nodejs_buildpack per manifest)
         run: |
           cf push "${BACKEND_HOST}-web" -f manifest.yml --vars-file vars.yml
 
-      - name: Smoke test — /healthz + /version
+      - name: Smoke test — /version (always) + /healthz (if API key set)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          base="https://${BACKEND_HOST}-web.${DOMAIN}"
-          echo "GET $base/healthz (expect 200 ok)"
-          # -f fails on HTTP >=400; retry a few times to ride out the
-          # post-deploy warm-up window.
-          curl -fsS --retry 5 --retry-all-errors --retry-delay 3 "$base/healthz"
-          echo
-          echo "GET $base/version (expect commit != unknown)"
-          version_body=$(curl -fsS --retry 3 --retry-all-errors --retry-delay 3 "$base/version")
+          backend="https://${BACKEND_HOST}.${DOMAIN}"
+          echo "GET $backend/version (expect commit != unknown)"
+          version_body=$(curl -fsS --retry 5 --retry-all-errors --retry-delay 3 "$backend/version")
           echo "$version_body"
           echo "$version_body" | grep -q '"commit"' || { echo "::error::/version missing commit field"; exit 1; }
           echo "$version_body" | grep -vq '"commit":"unknown"' || { echo "::error::ldflags not injected — commit is still 'unknown'"; exit 1; }
-          echo "::notice::Deploy green — /healthz and /version both passed"
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "GET $backend/healthz (expect 200 ok — API key is set)"
+            curl -fsS --retry 3 --retry-all-errors --retry-delay 3 "$backend/healthz"
+            echo
+            echo "::notice::Deploy green — /version and /healthz both passed"
+          else
+            echo "::notice::Deploy green — /version passed. Set ANTHROPIC_API_KEY secret to enable /healthz check."
+          fi
 
       - name: cf logout (always)
         if: always()
