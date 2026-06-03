@@ -23,7 +23,9 @@ type ReviewRunner interface {
 type reviewRequest struct {
 	// TransportRequestID is a SAP CTS transport request number.
 	// Format: 2-letter system prefix + K + 6 digits, all uppercase — e.g. NPLK900014.
-	TransportRequestID string `json:"transport_request_id" binding:"required,uppercase,min=9,max=10"`
+	// form tag covers HTMX's default application/x-www-form-urlencoded submissions;
+	// json tag covers direct API calls with Content-Type: application/json.
+	TransportRequestID string `json:"transport_request_id" form:"transport_request_id" binding:"required,uppercase,min=9,max=10"`
 }
 
 const contentTypeHTML = "text/html; charset=utf-8"
@@ -40,7 +42,9 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 	return func(c *gin.Context) {
 		// tmpl is unused: POST response is a hardcoded HTML bootstrap fragment
 		var req reviewRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		// ShouldBind auto-detects content type: handles both form-encoded (HTMX default)
+		// and JSON (direct API calls).
+		if err := c.ShouldBind(&req); err != nil {
 			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest, "transport_request_id is required", nil)
 			return
 		}

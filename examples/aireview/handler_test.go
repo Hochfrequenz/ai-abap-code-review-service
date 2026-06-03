@@ -91,6 +91,26 @@ func TestPost_ValidBody_Returns200WithLink(t *testing.T) {
 	}
 }
 
+func TestPost_FormEncoded_Returns200WithLink(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000099")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouter(store, &fakeRunner{}, tmpl)
+
+	// HTMX submits forms as application/x-www-form-urlencoded by default.
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews",
+		strings.NewReader("transport_request_id=NPLK900014"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "/reviews/") {
+		t.Errorf("response should contain review link, got: %s", w.Body.String())
+	}
+}
+
 func TestPost_EmptyBody_Returns400(t *testing.T) {
 	store := newFakeStore("00000000-0000-0000-0000-000000000002")
 	tmpl := ui.MustLoadTemplates()
