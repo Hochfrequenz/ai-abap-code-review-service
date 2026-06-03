@@ -11,6 +11,7 @@ import (
 
 	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
@@ -109,7 +110,7 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 	}
 }
 
-// getTransportRequests returns all open (modifiable) transport requests as HTML
+// getTransportRequests returns open (modifiable) transport requests as HTML
 // <option> elements for a <datalist>, sorted by number descending (most recent first).
 // On ADT error it returns an empty 200 so the form stays usable.
 func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
@@ -118,9 +119,17 @@ func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 			c.Data(http.StatusOK, contentTypeHTML, nil)
 			return
 		}
+		// Use the authenticated user's SAP username from the JWT so SAP CTS returns
+		// that user's transport requests. The BTP Destination technical user has no
+		// development TRs, so an empty user filter would always yield an empty list.
+		var sapUser string
+		if claims, ok := c.Get("jwtClaims"); ok {
+			if m, ok := claims.(jwt.MapClaims); ok {
+				sapUser, _ = m["user_name"].(string)
+			}
+		}
 		// "D" = modifiable (open) requests only; "L" = released.
-		// Empty user string returns all users' open TRs — intentional for a review tool.
-		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
+		trs, err := lister.GetTransportRequests(c.Request.Context(), sapUser, "D")
 		if err != nil {
 			// Best-effort: a broken ADT connection must not break the form.
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
