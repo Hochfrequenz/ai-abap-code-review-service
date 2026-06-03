@@ -21,7 +21,7 @@ import (
 // AI backend. Swap the implementation in cmd/server/main.go to replace Claude
 // with a different AI provider (e.g. OpenAI, Gemini) without touching the
 // handler or any other layer.
-// model must be a key from agent.AllowedModels(); pass "" to use the default.
+// model must be a non-empty key from agent.AllowedModels(); empty string is rejected with 400.
 type ReviewRunner interface {
 	Run(ctx context.Context, trID, model string) (string, error)
 }
