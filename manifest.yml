@@ -31,9 +31,9 @@ applications:
     env:
       GIN_MODE: release
     services:
-      - go-xsuaa
-      - go-dest
-      - go-cc
+      - ai-abap-code-review-service-xsuaa
+      - ai-abap-code-review-service-dest
+      - ai-abap-code-review-service-cc
 
   # SAP approuter — the browser-facing front door. Runs OAuth auth-code flow
   # against XSUAA and forwards the resulting JWT to the Go backend via the
@@ -53,4 +53,4 @@ applications:
             "forwardAuthToken": true }
         ]
     services:
-      - go-xsuaa
+      - ai-abap-code-review-service-xsuaa

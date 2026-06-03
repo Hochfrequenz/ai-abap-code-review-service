@@ -1,5 +1,5 @@
 {
-  "xsappname": "go-btp-mwe",
+  "xsappname": "ai-abap-code-review-service",
   "tenant-mode": "dedicated",
   "description": "Security config for the Go BTP Cloud Foundry MWE",
   "scopes": [
