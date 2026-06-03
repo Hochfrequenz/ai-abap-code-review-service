@@ -92,8 +92,32 @@ func mustRenderStatus(t *testing.T, tmpl ui.Templates, job *reviewstore.Job) str
 	return out
 }
 
+// selectOptions extracts <option value="..."> entries from a single named <select> block.
+func selectOptions(t *testing.T, html, selectID string) map[string]bool {
+	t.Helper()
+	open := `<select id="` + selectID + `"`
+	start := strings.Index(html, open)
+	if start == -1 {
+		t.Fatalf("no <select id=%q> found in rendered HTML", selectID)
+	}
+	end := strings.Index(html[start:], "</select>")
+	if end == -1 {
+		t.Fatalf("no </select> closing tag found after <select id=%q>", selectID)
+	}
+	block := html[start : start+end]
+	re := regexp.MustCompile(`<option value="([^"]+)"`)
+	matches := re.FindAllStringSubmatch(block, -1)
+	values := make(map[string]bool)
+	for _, m := range matches {
+		if len(m) > 1 {
+			values[m[1]] = true
+		}
+	}
+	return values
+}
+
 // TestModelSelectOptionsMatchAllowedModels guards against drift between the
-// hardcoded <option value="..."> entries in index.html and agent.AllowedModels().
+// hardcoded <option value="..."> entries in the #model select and agent.AllowedModels().
 // If a model is added to AllowedModels() but not the HTML (or vice versa), this test fails.
 func TestModelSelectOptionsMatchAllowedModels(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
@@ -101,28 +125,39 @@ func TestModelSelectOptionsMatchAllowedModels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderIndex: %v", err)
 	}
-
-	// Extract all <option value="..."> inside the #model select.
-	// We rely on the select having id="model" and the options following it.
-	re := regexp.MustCompile(`<option value="([^"]+)"`)
-	matches := re.FindAllStringSubmatch(html, -1)
-
-	htmlValues := make(map[string]bool)
-	for _, m := range matches {
-		if len(m) > 1 {
-			htmlValues[m[1]] = true
-		}
-	}
-
+	htmlValues := selectOptions(t, html, "model")
 	allowed := agent.AllowedModels()
 	for modelID := range allowed {
 		if !htmlValues[modelID] {
-			t.Errorf("AllowedModels key %q has no matching <option value> in index.html", modelID)
+			t.Errorf("AllowedModels key %q has no matching <option value> in #model select", modelID)
 		}
 	}
 	for htmlVal := range htmlValues {
 		if _, ok := allowed[htmlVal]; !ok {
-			t.Errorf("index.html has <option value=%q> which is not in AllowedModels()", htmlVal)
+			t.Errorf("#model select has <option value=%q> which is not in AllowedModels()", htmlVal)
+		}
+	}
+}
+
+// TestPromptSelectOptionsMatchAllowedPrompts guards against drift between the
+// hardcoded <option value="..."> entries in the #prompt select and agent.AllowedPrompts().
+// If a prompt is added to AllowedPrompts() but not the HTML (or vice versa), this test fails.
+func TestPromptSelectOptionsMatchAllowedPrompts(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	html, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	htmlValues := selectOptions(t, html, "prompt")
+	allowed := agent.AllowedPrompts()
+	for promptID := range allowed {
+		if !htmlValues[promptID] {
+			t.Errorf("AllowedPrompts key %q has no matching <option value> in #prompt select", promptID)
+		}
+	}
+	for htmlVal := range htmlValues {
+		if _, ok := allowed[htmlVal]; !ok {
+			t.Errorf("#prompt select has <option value=%q> which is not in AllowedPrompts()", htmlVal)
 		}
 	}
 }

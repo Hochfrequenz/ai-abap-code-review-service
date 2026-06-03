@@ -105,6 +105,13 @@
         list-style:none; z-index:10; box-shadow:0 4px 8px rgba(0,0,0,.1);
       "></ul>
     </div>
+    <label for="prompt">Rezensions-Stil</label>
+    <select id="prompt" name="prompt">
+      <option value="review_pedantic" selected>Pedantische Code-Review für erfahrene Entwickler*innen</option>
+      <option value="review_appreciative">Wertschätzende Code-Review mit praktischen Tipps für Newbies</option>
+      <option value="review_analytical">Technisch-Analytische Code-Review (Selbst-Konsistenz des TA)</option>
+      <option value="review_guidelines_hf">Prüfung gegen HF-Entwicklungsrichtlinien</option>
+    </select>
     <label for="model">Modell</label>
     <select id="model" name="model">
       <option value="claude-opus-4-8" selected>Opus 4.8 (beste Qualität)</option>
