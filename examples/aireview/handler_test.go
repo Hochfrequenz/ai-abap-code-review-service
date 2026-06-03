@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
 	"github.com/hochfrequenz/ai-abap-code-review-service/examples/aireview"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
@@ -61,12 +62,25 @@ func (f *fakeRunner) Run(_ context.Context, _ string) (string, error) {
 	return "# Review\n\nAll good.", nil
 }
 
-func newRouter(store reviewstore.JobStore, runner aireview.ReviewRunner, tmpl ui.Templates) *gin.Engine {
+type fakeTransportRequestLister struct {
+	requests []adt.TransportRequest
+	err      error
+}
+
+func (f *fakeTransportRequestLister) GetTransportRequests(_ context.Context, _, _ string) ([]adt.TransportRequest, error) {
+	return f.requests, f.err
+}
+
+func newRouterWithLister(store reviewstore.JobStore, runner aireview.ReviewRunner, lister aireview.TransportRequestLister, tmpl ui.Templates) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	api := r.Group("/api")
-	aireview.Register(api, context.Background(), store, runner, tmpl)
+	aireview.Register(api, context.Background(), store, runner, lister, tmpl)
 	return r
+}
+
+func newRouter(store reviewstore.JobStore, runner aireview.ReviewRunner, tmpl ui.Templates) *gin.Engine {
+	return newRouterWithLister(store, runner, nil, tmpl)
 }
 
 func TestPost_ValidBody_Returns200WithLink(t *testing.T) {
@@ -200,5 +214,57 @@ func TestGetStatus_UnknownID_Returns404(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status: got %d, want 404", w.Code)
+	}
+}
+
+func TestGetTransportRequests_ReturnsSortedOptions(t *testing.T) {
+	lister := &fakeTransportRequestLister{
+		requests: []adt.TransportRequest{
+			{Number: "NPLK900001", Description: "Old TR", Owner: "USER1"},
+			{Number: "NPLK900014", Description: "New TR", Owner: "USER2"},
+			{Number: "NPLK900007", Description: "Mid TR", Owner: "USER1"},
+		},
+	}
+	store := newFakeStore("00000000-0000-0000-0000-000000000010")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouterWithLister(store, &fakeRunner{}, lister, tmpl)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/transport-requests", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	pos14 := strings.Index(body, "NPLK900014")
+	pos07 := strings.Index(body, "NPLK900007")
+	pos01 := strings.Index(body, "NPLK900001")
+	if pos14 < 0 || pos07 < 0 || pos01 < 0 {
+		t.Fatalf("missing TR numbers in response: %s", body)
+	}
+	if !(pos14 < pos07 && pos07 < pos01) {
+		t.Errorf("TRs not in descending order: pos14=%d pos07=%d pos01=%d", pos14, pos07, pos01)
+	}
+	if !strings.Contains(body, "New TR") || !strings.Contains(body, "USER2") {
+		t.Errorf("description/owner missing: %s", body)
+	}
+}
+
+func TestGetTransportRequests_ADTError_ReturnsEmpty(t *testing.T) {
+	lister := &fakeTransportRequestLister{err: fmt.Errorf("ADT unreachable")}
+	store := newFakeStore("00000000-0000-0000-0000-000000000011")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouterWithLister(store, &fakeRunner{}, lister, tmpl)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/transport-requests", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("ADT error must not bubble as non-200, got %d", w.Code)
+	}
+	if w.Body.String() != "" {
+		t.Errorf("expected empty body on ADT error, got: %s", w.Body.String())
 	}
 }

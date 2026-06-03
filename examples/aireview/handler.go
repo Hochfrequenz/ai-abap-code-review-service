@@ -3,8 +3,12 @@ package aireview
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"sort"
+	"strings"
 
+	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
 
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
@@ -20,6 +24,12 @@ type ReviewRunner interface {
 	Run(ctx context.Context, trID string) (string, error)
 }
 
+// TransportRequestLister retrieves open CTS transport requests from SAP ADT.
+// Satisfied by adtler.Client in production; use a one-method fake in tests.
+type TransportRequestLister interface {
+	GetTransportRequests(ctx context.Context, user, status string) ([]adt.TransportRequest, error)
+}
+
 type reviewRequest struct {
 	// TransportRequestID is a SAP CTS transport request number.
 	// Format: 2-letter system prefix + K + 6 digits, all uppercase — e.g. NPLK900014.
@@ -30,12 +40,13 @@ type reviewRequest struct {
 
 const contentTypeHTML = "text/html; charset=utf-8"
 
-// Register attaches the two aireview routes to the JWT-guarded api group.
+// Register attaches the aireview routes to the JWT-guarded api group.
 // rootCtx must be the server's root context (not a request context) so the
 // goroutine continues after the HTTP response is written.
-func Register(api *gin.RouterGroup, rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, tmpl ui.Templates) {
+func Register(api *gin.RouterGroup, rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, lister TransportRequestLister, tmpl ui.Templates) {
 	api.POST("/reviews", postReview(rootCtx, store, runner, tmpl))
 	api.GET("/reviews/:id/status", getStatus(store, tmpl))
+	api.GET("/transport-requests", getTransportRequests(lister))
 }
 
 func postReview(rootCtx context.Context, store reviewstore.JobStore, runner ReviewRunner, _ ui.Templates) gin.HandlerFunc {
@@ -94,5 +105,31 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 			return
 		}
 		c.Data(http.StatusOK, contentTypeHTML, []byte(html))
+	}
+}
+
+// getTransportRequests returns all open (modifiable) transport requests as HTML
+// <option> elements for a <datalist>, sorted by number descending (most recent first).
+// On ADT error it returns an empty 200 so the form stays usable.
+func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if lister == nil {
+			c.Data(http.StatusOK, contentTypeHTML, nil)
+			return
+		}
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
+		if err != nil {
+			// Best-effort: a broken ADT connection must not break the form.
+			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
+			c.Data(http.StatusOK, contentTypeHTML, nil)
+			return
+		}
+		sort.Slice(trs, func(i, j int) bool { return trs[i].Number > trs[j].Number })
+		var b strings.Builder
+		for _, tr := range trs {
+			fmt.Fprintf(&b, "<option value=%q>%s — %s (%s)</option>\n",
+				tr.Number, tr.Number, tr.Description, tr.Owner)
+		}
+		c.Data(http.StatusOK, contentTypeHTML, []byte(b.String()))
 	}
 }

@@ -265,7 +265,7 @@ func buildRouter(
 	})
 
 	// HTMX API routes (JWT-gated via the api group)
-	aireview.Register(api, rootCtx, store, runner, tmpl)
+	aireview.Register(api, rootCtx, store, runner, nil, tmpl)
 
 	return r
 }
