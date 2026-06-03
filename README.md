@@ -75,6 +75,49 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 CI/CD: deployment is triggered by **publishing a GitHub Release** — not by push to `main`.
 The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` space in `HF Dev Account_hf-cf` on `eu10`, and smoke-tests `/healthz` and `/version`.
 
+## Operations notes (HF deployment)
+
+Findings from first deployment — documented here so the next person doesn't have to rediscover them.
+
+### Finding the SAP technical user
+
+The BTP Destination `HF_S4` authenticates to the on-premise SAP system with a technical username and password (BasicAuthentication).
+To see which user that is:
+
+> BTP cockpit → **Connectivity → Destinations → HF_S4** → Authentication section → **User** field
+
+Currently: **`metzej`**.
+The technical user must have `SAP_BC_TRANSPORT_ADMINISTRATOR` in SAP (SU01 → Roles tab) to list transport requests via ADT.
+Without it, all TR-listing calls return an empty response with HTTP 200 — no error, just no data.
+
+### XSUAA login: choose Default Identity Provider
+
+The login page shows multiple identity providers.
+Always choose **Default Identity Provider** (SAP ID Service / accounts.sap.com).
+Corporate SSO is listed separately and will not work for this app.
+
+### Transport request suggestions: why SQL instead of the ADT organizer tree
+
+The standard ADT endpoint for listing open TRs (`GET /sap/bc/adt/cts/transportrequests` with Accept `application/vnd.sap.adt.transportorganizertree.v1+xml`) returns an empty `<tm:root/>` on this S/4HANA system.
+Root cause: the system classifies its transport requests as `KORRDEV="SYST"` or `"CUST"` instead of the standard `"K"` (workbench).
+The organizer tree endpoint silently ignores non-K requests.
+
+Workaround implemented in `internal/adtclient/sqllister.go`: query `E070` and `E07T` directly via `RunQuery` (ADT data preview SQL API).
+This returns all request types regardless of KORRDEV.
+See [adtler issue #63](https://github.com/Hochfrequenz/adtler/issues/63) for the full root cause analysis.
+
+### `/healthz` returns 503 when `ANTHROPIC_API_KEY` is missing
+
+The health endpoint checks for required env vars at runtime.
+If the key is missing it returns `503 {"status":"unhealthy","missing":["ANTHROPIC_API_KEY"]}` — this is intentional.
+Set the key via `cf set-env ai-abap-code-review-service ANTHROPIC_API_KEY sk-ant-...` then `cf restage`.
+
+### JWT `user_name` is an email, not a SAP username
+
+The XSUAA JWT claim `user_name` contains the user's BTP email address (e.g. `konstantin.klein@hochfrequenz.de`).
+SAP CTS stores usernames as short login IDs (`METZEJ`, `KLEINK`).
+These cannot be mapped automatically — do not use `user_name` as a SAP user filter.
+
 ## Customisation
 
 | What | Where |
