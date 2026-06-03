@@ -75,14 +75,14 @@ func (r *Runner) Preflight(ctx context.Context, trID string) error {
 		return fmt.Errorf("ADT nicht erreichbar — bitte SAP-Verbindung und Cloud-Connector prüfen")
 	}
 	if len(objs) == 0 {
-		return fmt.Errorf("Transportauftrag %q nicht gefunden oder enthält keine Objekte", trID)
+		return fmt.Errorf("keine Objekte im Transportauftrag %q gefunden — bitte Nummer prüfen", trID)
 	}
 	for _, obj := range objs {
 		if obj.URI != "" {
 			return nil
 		}
 	}
-	return fmt.Errorf("Transportauftrag %q enthält keine prüfbaren Quellobjekte (PROG, CLAS, INTF) — nur Customizing- oder Dictionary-Objekte ohne Quellcode", trID)
+	return fmt.Errorf("keine prüfbaren Quellobjekte in %q (PROG, CLAS, INTF) — der Transport enthält nur Customizing- oder Dictionary-Objekte ohne Quellcode", trID)
 }
 
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
