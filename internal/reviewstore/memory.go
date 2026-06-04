@@ -55,7 +55,7 @@ func (s *memoryStore) MarkRunning(_ context.Context, id string) error {
 	return s.update(id, func(j *Job) { j.Status = JobStatusRunning })
 }
 
-func (s *memoryStore) MarkDone(_ context.Context, id string, reviewMarkdown string) error {
+func (s *memoryStore) MarkDone(_ context.Context, id string, reviewMarkdown string, usage TokenUsage) error {
 	html, err := renderMarkdown(reviewMarkdown)
 	if err != nil {
 		return err
@@ -64,6 +64,7 @@ func (s *memoryStore) MarkDone(_ context.Context, id string, reviewMarkdown stri
 	return s.update(id, func(j *Job) {
 		j.Status = JobStatusDone
 		j.ReviewHTML = html
+		j.Usage = usage
 		j.FinishedAt = &now
 	})
 }

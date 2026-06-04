@@ -27,7 +27,7 @@ type ReviewRunner interface {
 	// Preflight checks the transport request before any AI tokens are spent.
 	// Returns a German user-facing error if the TR is unreachable or has no reviewable objects.
 	Preflight(ctx context.Context, trID string) error
-	Run(ctx context.Context, trID, model, promptKey string) (string, error)
+	Run(ctx context.Context, trID, model, promptKey string) (string, reviewstore.TokenUsage, error)
 }
 
 // TransportRequestLister retrieves open CTS transport requests from SAP ADT.
@@ -99,12 +99,12 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 				_ = store.MarkFailed(ctx, jobID, err.Error())
 				return
 			}
-			md, runErr := runner.Run(ctx, trID, model, promptKey)
+			md, usage, runErr := runner.Run(ctx, trID, model, promptKey)
 			if runErr != nil {
 				_ = store.MarkFailed(ctx, jobID, runErr.Error())
 				return
 			}
-			_ = store.MarkDone(ctx, jobID, md)
+			_ = store.MarkDone(ctx, jobID, md, usage)
 		}(context.WithoutCancel(rootCtx), job.ID, job.TRID, req.Model, req.Prompt)
 
 		fragment := fmt.Sprintf(
