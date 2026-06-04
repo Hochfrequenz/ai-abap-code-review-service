@@ -147,9 +147,10 @@ type openTR struct {
 }
 
 // getTransportRequests returns transport requests as a JSON array, sorted by
-// number descending (newest first). Accepts ?released=true to include released
-// (TRSTATUS=R) TRs in addition to open ones. The browser fetches this once on
-// page load and filters client-side. On ADT error returns an empty JSON array.
+// number descending (newest first). Accepts ?released=true to drop the TRSTATUS
+// filter entirely (returns all statuses: open, released, locked). The browser
+// fetches this once on page load and filters client-side. On ADT error returns
+// an empty JSON array.
 func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if lister == nil {
