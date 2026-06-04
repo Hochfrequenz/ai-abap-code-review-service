@@ -142,10 +142,8 @@
     // ABAP is not natively in highlight.js; vbscript gives reasonable
     // keyword/string highlighting for ABAP syntax.
     document.addEventListener('htmx:afterSwap', () => {
-      document.querySelectorAll('pre code').forEach(el => {
-        if (el.classList.contains('language-abap')) {
-          el.classList.add('language-vbscript');
-        }
+      document.querySelectorAll('pre code.language-abap').forEach(el => {
+        el.classList.add('language-vbscript');
         hljs.highlightElement(el);
       });
     });
