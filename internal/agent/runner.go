@@ -33,6 +33,9 @@ const reviewMaxTokens = int64(8192)
 // reviewMaxToolLoops caps the tool-use iterations per review.
 const reviewMaxToolLoops = 50
 
+//go:embed prompts/review_base.md
+var promptBase string
+
 //go:embed prompts/review_pedantic.md
 var promptPedantic string
 
@@ -47,12 +50,15 @@ var promptGuidelinesHF string
 
 // AllowedPrompts returns the set of review styles the service accepts,
 // mapped to their German UI label and compiled-in system prompt text.
+// Each style prompt is prefixed with the shared base (tool-calling procedure
+// and language rules) so the style files only contain role + criteria + format.
 func AllowedPrompts() map[string]Prompt {
+	base := promptBase + "\n\n---\n\n"
 	return map[string]Prompt{
-		"review_pedantic":      {Label: "Pedantische Code-Review für erfahrene Entwickler*innen", Text: promptPedantic},
-		"review_appreciative":  {Label: "Wertschätzende Code-Review mit praktischen Tipps für Newbies", Text: promptAppreciative},
-		"review_analytical":    {Label: "Technisch-Analytische Code-Review (Selbst-Konsistenz des TA)", Text: promptAnalytical},
-		"review_guidelines_hf": {Label: "Prüfung gegen HF-Entwicklungsrichtlinien", Text: promptGuidelinesHF},
+		"review_pedantic":      {Label: "Pedantische Code-Review für erfahrene Entwickler*innen", Text: base + promptPedantic},
+		"review_appreciative":  {Label: "Wertschätzende Code-Review mit praktischen Tipps für Newbies", Text: base + promptAppreciative},
+		"review_analytical":    {Label: "Technisch-Analytische Code-Review (Selbst-Konsistenz des TA)", Text: base + promptAnalytical},
+		"review_guidelines_hf": {Label: "Prüfung gegen HF-Entwicklungsrichtlinien", Text: base + promptGuidelinesHF},
 	}
 }
 
