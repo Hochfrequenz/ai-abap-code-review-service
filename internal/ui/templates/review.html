@@ -122,6 +122,14 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/vbscript.min.js"></script>
+  <script>
+    // Register 'abap' as an alias for the vbscript grammar so hljs recognises
+    // ```abap fences. Must run before any highlightAll() call.
+    document.addEventListener('DOMContentLoaded', function() {
+      hljs.registerAliases({'vbscript': ['abap']});
+      hljs.highlightAll();
+    });
+  </script>
 </head>
 <body>
   <nav><a href="/">← Neue Review</a></nav>
@@ -138,22 +146,9 @@
   {{- end -}}
   </div>
   <script>
-    // Highlight all code blocks after HTMX swaps in the review content.
-    // ABAP is not natively in highlight.js; vbscript gives reasonable
-    // keyword/string highlighting for ABAP syntax.
-    document.addEventListener('htmx:afterSwap', () => {
-      document.querySelectorAll('pre code.language-abap').forEach(el => {
-        el.classList.add('language-vbscript');
-        hljs.highlightElement(el);
-      });
-    });
-    // Also highlight on initial load for direct /reviews/{id} visits.
-    document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('pre code.language-abap').forEach(el => {
-        el.classList.add('language-vbscript');
-        hljs.highlightElement(el);
-      });
-    });
+    // Re-run highlighting after HTMX swaps (e.g. polling status updates).
+    // hljs.highlightAll() skips already-highlighted elements via data-highlighted.
+    document.addEventListener('htmx:afterSwap', () => hljs.highlightAll());
   </script>
 </body>
 </html>
