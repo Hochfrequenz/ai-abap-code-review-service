@@ -27,11 +27,11 @@ There is no paid service or subscription; you bring your own Anthropic API key a
 
    This rewrites module paths, Go import paths, manifest files, XSUAA security config, CF deploy workflow, and destination-name constants throughout the codebase automatically — you don't touch Go code. See `config.yml` for the full list of configurable fields.
 
-2. **Set the API key** in your CF environment:
+2. **Set repository secrets** — in your GitHub repository go to Settings → Secrets and variables → Actions and add:
+   - `ANTHROPIC_API_KEY` — your Anthropic API key
+   - `CF_USER` and `CF_PASSWORD` — your Cloud Foundry credentials
 
-   ```bash
-   cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...
-   ```
+   The CD pipeline reads these and sets them on the CF app automatically.
 
 3. **Build and deploy** — copy `vars.example.yml` to `vars.yml` and fill in your values, cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then:
 
