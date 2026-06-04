@@ -70,6 +70,10 @@ work out of the box.
 
 Remaining steps (CF service creation, `cf push`, XSUAA setup) stay as-is.
 
+**The Customisation table must also be updated.** It currently contains two stale rows:
+- The row referencing `internal/agent/prompts/review_prompt.md` (file deleted) must be replaced: the prompt style is now selected in the UI; the files to edit are `internal/agent/prompts/review_*.md`.
+- The "AI model" row referencing a `reviewModel` constant (removed) must be replaced: the model is now selected per-review in the UI from the set defined in `AllowedModels()` in `internal/agent/runner.go`.
+
 ### 4. Forking section (after Quick Start, before Architecture)
 
 ```markdown
