@@ -19,7 +19,10 @@ There is no paid service or subscription; you bring your own Anthropic API key a
   for known authorization edge cases on S/4HANA)
 - Anthropic API key
 
-1. **Fork and configure** — fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run:
+1. **Update `LICENSE` and `.github/CODEOWNERS`** — replace the Hochfrequenz copyright and team with your own.
+   The CI gate (`template-guards.yml`) enforces this and will fail until updated.
+
+2. **Fork and configure** — fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run:
 
    ```bash
    go run ./cmd/apply-config
@@ -27,24 +30,24 @@ There is no paid service or subscription; you bring your own Anthropic API key a
 
    This rewrites module paths, Go import paths, manifest files, XSUAA security config, CF deploy workflow, and destination-name constants throughout the codebase automatically — you don't touch Go code. See `config.yml` for the full list of configurable fields.
 
-2. **Set repository secrets** — in your GitHub repository go to Settings → Secrets and variables → Actions and add:
+3. **Set repository secrets** — in your GitHub repository go to Settings → Secrets and variables → Actions and add:
    - `ANTHROPIC_API_KEY` — your Anthropic API key
    - `CF_USER` and `CF_PASSWORD` — your Cloud Foundry credentials
 
    The CD pipeline reads these and sets them on the CF app automatically.
 
-3. **Initial deployment** — copy `vars.example.yml` to `vars.yml`, fill in your CF org/space/domain, then do a one-time manual push to create the CF app and bind services:
+4. **Initial deployment** — copy `vars.example.yml` to `vars.yml`, fill in your CF org/space/domain, then do a one-time manual push to create the CF app and bind services:
 
    ```bash
    make build-linux   # or: .\scripts\build.ps1 on Windows
    cf push --vars-file vars.yml
    ```
 
-4. **Ongoing updates** — publish a GitHub Release.
+5. **Ongoing updates** — publish a GitHub Release.
    The CD pipeline (`.github/workflows/deploy.yml`) cross-compiles the binary, runs all checks, and pushes to CF automatically using your repository secrets.
    Manual deployment from a developer machine is only needed for the initial setup.
 
-5. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
+6. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
 
 ## Customising the review prompts
 

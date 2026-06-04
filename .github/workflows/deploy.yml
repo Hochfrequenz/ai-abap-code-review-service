@@ -13,6 +13,8 @@ permissions:
   contents: read
 
 env:
+  # These values are rewritten automatically by `go run ./cmd/apply-config`
+  # when you edit config.yml before forking. You do not need to edit this file manually.
   CF_API: https://api.cf.eu10.hana.ondemand.com
   CF_ORG: HF Dev Account_hf-cf
   CF_SPACE: dev
