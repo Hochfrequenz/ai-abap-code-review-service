@@ -38,7 +38,7 @@ func TestMarkDone_StoresHTMLAndTimestamp(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
 	job, _ := store.Create(context.Background(), "TR001")
 
-	err := store.MarkDone(context.Background(), job.ID, "# Review\n\nLooks good.")
+	err := store.MarkDone(context.Background(), job.ID, "# Review\n\nLooks good.", reviewstore.TokenUsage{})
 	if err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}

@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"github.com/anthropics/anthropic-sdk-go"
+
+	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
 )
 
 // Prompt pairs a German UI label with the compiled-in system prompt text.
@@ -93,12 +95,20 @@ func (r *Runner) Preflight(ctx context.Context, trID string) error {
 	return fmt.Errorf("kein Quellcode abrufbar für %q — der Transport enthält Systemobjekte (SYST/CUST), die der ADT-Endpunkt nicht zurückgibt", trID)
 }
 
+// modelCostPerMillion holds [input, output, cacheWrite, cacheRead] prices in USD per million tokens.
+// Approximate as of mid-2025 — treat as estimates, not invoices.
+var modelCostPerMillion = map[string][4]float64{
+	string(anthropic.ModelClaudeOpus4_8):           {15.00, 75.00, 18.75, 1.50},
+	string(anthropic.ModelClaudeSonnet4_6):         {3.00, 15.00, 3.75, 0.30},
+	string(anthropic.ModelClaudeHaiku4_5_20251001): {0.80, 4.00, 1.00, 0.08},
+}
+
 // Run calls Claude with tool access, letting it autonomously fetch TR objects
-// and source code, then returns the final markdown review text.
+// and source code, then returns the final markdown review text and token usage.
 // model must be a non-empty key from AllowedModels(); promptKey must be a non-empty
 // key from AllowedPrompts(). Callers are responsible for validation — Run does not
 // default or substitute silently.
-func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string, error) {
+func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string, reviewstore.TokenUsage, error) {
 	promptText := AllowedPrompts()[promptKey].Text
 	messages := []anthropic.MessageParam{
 		anthropic.NewUserMessage(anthropic.NewTextBlock(
@@ -107,6 +117,7 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 	}
 
 	toolDefs := r.buildToolDefs()
+	var usage reviewstore.TokenUsage
 
 	for range reviewMaxToolLoops {
 		resp, err := r.client.Messages.New(ctx, anthropic.MessageNewParams{
@@ -122,26 +133,40 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 			Messages: messages,
 		})
 		if err != nil {
-			return "", fmt.Errorf("claude api: %w", err)
+			return "", usage, fmt.Errorf("claude api: %w", err)
 		}
+
+		usage.InputTokens += resp.Usage.InputTokens
+		usage.OutputTokens += resp.Usage.OutputTokens
+		usage.CacheCreationTokens += resp.Usage.CacheCreationInputTokens
+		usage.CacheReadTokens += resp.Usage.CacheReadInputTokens
 
 		messages = append(messages, resp.ToParam())
 
 		if resp.StopReason == anthropic.StopReasonEndTurn || resp.StopReason == "max_tokens" {
+			if p, ok := modelCostPerMillion[model]; ok {
+				// The Anthropic SDK returns disjoint token buckets: InputTokens is
+				// non-cached plain input; CacheCreationInputTokens and
+				// CacheReadInputTokens are separate. All three are priced independently.
+				usage.EstimatedCostUSD = (float64(usage.InputTokens)*p[0] +
+					float64(usage.OutputTokens)*p[1] +
+					float64(usage.CacheCreationTokens)*p[2] +
+					float64(usage.CacheReadTokens)*p[3]) / 1_000_000
+			}
 			for _, block := range resp.Content {
 				if block.Type == "text" {
 					text := block.Text
 					if resp.StopReason == "max_tokens" {
 						text += "\n\n---\n*Review truncated: output token limit reached.*"
 					}
-					return text, nil
+					return text, usage, nil
 				}
 			}
-			return "", fmt.Errorf("no text block in response (stop_reason: %s)", resp.StopReason)
+			return "", usage, fmt.Errorf("no text block in response (stop_reason: %s)", resp.StopReason)
 		}
 
 		if resp.StopReason != anthropic.StopReasonToolUse {
-			return "", fmt.Errorf("unexpected stop_reason: %s", resp.StopReason)
+			return "", usage, fmt.Errorf("unexpected stop_reason: %s", resp.StopReason)
 		}
 
 		var toolResults []anthropic.ContentBlockParamUnion
@@ -156,11 +181,11 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 			toolResults = append(toolResults, anthropic.NewToolResultBlock(block.ID, result, callErr != nil))
 		}
 		if len(toolResults) == 0 {
-			return "", fmt.Errorf("stop_reason tool_use but no tool_use blocks in response")
+			return "", usage, fmt.Errorf("stop_reason tool_use but no tool_use blocks in response")
 		}
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
-	return "", fmt.Errorf("review did not complete within %d tool-use iterations", reviewMaxToolLoops)
+	return "", usage, fmt.Errorf("review did not complete within %d tool-use iterations", reviewMaxToolLoops)
 }
 
 // dispatch routes a tool call by name to the appropriate handler.

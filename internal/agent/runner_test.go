@@ -51,7 +51,7 @@ func TestRunner_UsesSpecifiedModel(t *testing.T) {
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
 	runner := agent.NewRunner(tools, claudeClient)
 
-	_, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6), "review_pedantic")
+	_, _, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6), "review_pedantic")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -117,12 +117,23 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	)
 
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	result, usage, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if !strings.Contains(result, "Code Review") {
 		t.Errorf("expected review text in result, got: %q", result)
+	}
+	// Token counts must accumulate across both loop iterations: 10+20=30 input, 5+15=20 output.
+	if usage.InputTokens != 30 {
+		t.Errorf("InputTokens: want 30, got %d", usage.InputTokens)
+	}
+	if usage.OutputTokens != 20 {
+		t.Errorf("OutputTokens: want 20, got %d", usage.OutputTokens)
+	}
+	// Cost: (30*15 + 20*75) / 1_000_000 = (450 + 1500) / 1_000_000 = 0.00195
+	if usage.EstimatedCostUSD < 0.001 || usage.EstimatedCostUSD > 0.01 {
+		t.Errorf("EstimatedCostUSD out of expected range: %f", usage.EstimatedCostUSD)
 	}
 	if len(calls) != 1 || calls[0] != "list_tr_objects" {
 		t.Errorf("expected list_tr_objects call, got: %v", calls)
@@ -195,7 +206,7 @@ func TestRunner_DispatchTools(t *testing.T) {
 			tools := agent.NewTools(fake)
 			claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 			runner := agent.NewRunner(tools, claudeClient)
-			result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+			result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
@@ -223,7 +234,7 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	result, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err != nil {
 		t.Fatalf("expected partial result not error, got: %v", err)
 	}
@@ -249,7 +260,7 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	_, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err == nil {
 		t.Error("expected error for unexpected stop reason")
 	}
@@ -281,7 +292,7 @@ func TestRunner_Preflight_EmptyTR(t *testing.T) {
 }
 
 func TestRunner_Preflight_AllEmptyURIs_TruelyEmpty(t *testing.T) {
-	// ADT returns objects but none have URIs, and E071 also has no rows → truly empty.
+	// ADT returns objects but none have URIs, and E071 also has no rows â†’ truly empty.
 	fake := &fakeADTClient{
 		trObjects:   []adt.TransportObject{{PgmID: "R3TR", Type: "TABU", Name: "T001"}},
 		queryResult: &adt.QueryResult{Rows: [][]string{}},
@@ -296,7 +307,7 @@ func TestRunner_Preflight_AllEmptyURIs_TruelyEmpty(t *testing.T) {
 }
 
 func TestRunner_Preflight_SystTransport(t *testing.T) {
-	// ADT returns nothing (SYST type), but E071 has rows → inform user, don't claim empty.
+	// ADT returns nothing (SYST type), but E071 has rows â†’ inform user, don't claim empty.
 	fake := &fakeADTClient{
 		trObjects:   []adt.TransportObject{},
 		queryResult: &adt.QueryResult{Rows: [][]string{{"NPLK000001"}}},
@@ -314,7 +325,7 @@ func TestRunner_Preflight_SystTransport(t *testing.T) {
 }
 
 func TestRunner_Preflight_EmptyTR_E071AlsoEmpty(t *testing.T) {
-	// ADT returns nothing and E071 is also empty → transport has no objects at all.
+	// ADT returns nothing and E071 is also empty â†’ transport has no objects at all.
 	fake := &fakeADTClient{
 		trObjects:   []adt.TransportObject{},
 		queryResult: &adt.QueryResult{Rows: [][]string{}},
@@ -387,7 +398,7 @@ func TestRunner_UsesSpecifiedPrompt(t *testing.T) {
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
 	runner := agent.NewRunner(tools, claudeClient)
 
-	_, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeOpus4_8), "review_analytical")
+	_, _, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeOpus4_8), "review_analytical")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

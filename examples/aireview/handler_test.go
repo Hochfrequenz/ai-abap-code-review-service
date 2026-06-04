@@ -47,7 +47,7 @@ func (f *fakeStore) Get(_ context.Context, _ string) (*reviewstore.Job, error) {
 	return f.job, f.getErr
 }
 func (f *fakeStore) MarkRunning(_ context.Context, _ string) error { return nil }
-func (f *fakeStore) MarkDone(_ context.Context, _ string, md string) error {
+func (f *fakeStore) MarkDone(_ context.Context, _ string, md string, _ reviewstore.TokenUsage) error {
 	f.job.Status = reviewstore.JobStatusDone
 	f.job.ReviewHTML = md
 	f.doneCh <- md
@@ -65,8 +65,8 @@ type fakeRunner struct {
 }
 
 func (f *fakeRunner) Preflight(_ context.Context, _ string) error { return f.preflightErr }
-func (f *fakeRunner) Run(_ context.Context, _, _, _ string) (string, error) {
-	return "# Review\n\nAll good.", nil
+func (f *fakeRunner) Run(_ context.Context, _, _, _ string) (string, reviewstore.TokenUsage, error) {
+	return "# Review\n\nAll good.", reviewstore.TokenUsage{}, nil
 }
 
 type fakeTransportRequestLister struct {
