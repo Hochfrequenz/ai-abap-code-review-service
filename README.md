@@ -46,21 +46,15 @@ There is no paid service or subscription; you bring your own Anthropic API key a
 
 5. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
 
-## Forking this template
+## Customising the review prompts
 
-This repo is designed to be forked. The only things you customize:
+Beyond the infrastructure setup above, the review behaviour itself is configured entirely in Markdown — no Go code needed.
 
-- `config.yml` — your BTP coordinates, SAP system destination name, CF org/space
-- `internal/agent/prompts/review_*.md` — review tone, criteria, output format
-  (plain Markdown, no Go). The file `review_guidelines_hf.md` contains
-  Hochfrequenz-specific coding guidelines — replace it with your own or delete it
-  (and remove its entry from `AllowedPrompts()` in `internal/agent/runner.go`).
-- `internal/agent/prompts/review_base.md` — shared tool-calling procedure, review language,
-  and ATC severity rules (all styles inherit this). Edit here to change the review language,
-  add/remove ADT tools, or adjust the base instructions.
+The four built-in review styles live in `internal/agent/prompts/review_*.md`.
+The file `review_guidelines_hf.md` contains Hochfrequenz-specific coding guidelines — replace it with your own organisation's standards or delete it (and remove its entry from `AllowedPrompts()` in `internal/agent/runner.go`).
 
-Run `go run ./cmd/apply-config` once after editing `config.yml`. See `config.yml`
-for the full list of fields it rewrites across the codebase.
+The shared procedure — which ADT tools to call, in which order, and what format to use — lives in `internal/agent/prompts/review_base.md`.
+All styles inherit it. Edit `review_base.md` to change the review language, add/remove ADT tools, or adjust the base instructions.
 
 For the underlying Go + SAP BTP Cloud Foundry template this service is built on,
 see [Hochfrequenz/go-sap-btp-cf-template](https://github.com/Hochfrequenz/go-sap-btp-cf-template).
