@@ -50,7 +50,7 @@ There is no paid service or subscription; you bring your own Anthropic API key a
 
 Beyond the infrastructure setup above, the review behaviour itself is configured entirely in Markdown — no Go code needed.
 
-The four built-in review styles live in `internal/agent/prompts/review_*.md`.
+The four built-in review styles are `review_pedantic.md`, `review_appreciative.md`, `review_analytical.md`, and `review_guidelines_hf.md` — all in `internal/agent/prompts/`.
 The file `review_guidelines_hf.md` contains Hochfrequenz-specific coding guidelines — replace it with your own organisation's standards or delete it (and remove its entry from `AllowedPrompts()` in `internal/agent/runner.go`).
 
 The shared procedure — which ADT tools to call, in which order, and what format to use — lives in `internal/agent/prompts/review_base.md`.
@@ -121,7 +121,8 @@ The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs th
 
 ## Operations notes (HF deployment)
 
-Findings from first deployment — documented here so the next person doesn't have to rediscover them.
+The following findings are specific to the Hochfrequenz deployment and are kept here as a reference for the original operators and for forks that encounter similar environments.
+Your system may behave differently.
 
 ### Finding the SAP technical user
 
@@ -153,7 +154,7 @@ See [adtler issue #63](https://github.com/Hochfrequenz/adtler/issues/63) for the
 
 The health endpoint checks for required env vars at runtime.
 If the key is missing it returns `503 {"error":{"code":"internal","message":"server misconfigured: missing required environment variables: ANTHROPIC_API_KEY"}}` — this is intentional.
-Set the key via `cf set-env ai-abap-code-review-service ANTHROPIC_API_KEY sk-ant-...` then `cf restage`.
+Set the key via `cf set-env <your-app-name> ANTHROPIC_API_KEY sk-ant-...` then `cf restage`.
 
 ### JWT `user_name` is an email, not a SAP username
 
