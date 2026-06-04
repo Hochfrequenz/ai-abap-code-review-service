@@ -254,7 +254,7 @@ func TestGetStatus_Pending_HasPolling(t *testing.T) {
 	}
 }
 
-func TestGetStatus_Done_HasContentNoPoll(t *testing.T) {
+func TestGetStatus_Done_HasLinkNoPoll(t *testing.T) {
 	store := newFakeStore("00000000-0000-0000-0000-000000000005")
 	store.job.Status = reviewstore.JobStatusDone
 	store.job.ReviewHTML = "<p>LGTM</p>"
@@ -269,8 +269,11 @@ func TestGetStatus_Done_HasContentNoPoll(t *testing.T) {
 	if strings.Contains(body, "hx-trigger") {
 		t.Error("done response must not poll")
 	}
-	if !strings.Contains(body, "LGTM") {
-		t.Errorf("done response must contain ReviewHTML, got: %s", body)
+	if !strings.Contains(body, "/reviews/00000000-0000-0000-0000-000000000005") {
+		t.Errorf("done response must contain link to review page, got: %s", body)
+	}
+	if strings.Contains(body, "LGTM") {
+		t.Error("done response must not embed review content inline")
 	}
 }
 

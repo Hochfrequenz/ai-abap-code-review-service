@@ -36,17 +36,17 @@ func TestStatusFragment_Pending_HasPolling(t *testing.T) {
 	}
 }
 
-func TestStatusFragment_Done_HasContentNoPoll(t *testing.T) {
+func TestStatusFragment_Done_HasLinkNoPoll(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	out := mustRenderStatus(t, tmpl, doneJob())
 	if strings.Contains(out, "hx-trigger") {
 		t.Error("done fragment must not poll")
 	}
-	if !strings.Contains(out, "LGTM") {
-		t.Error("done fragment must contain ReviewHTML content")
+	if !strings.Contains(out, "/reviews/abc-123") {
+		t.Error("done fragment must contain link to review page")
 	}
-	if !strings.Contains(out, "window.print()") {
-		t.Error("done fragment must have print button")
+	if strings.Contains(out, "LGTM") {
+		t.Error("done fragment must not embed review content inline")
 	}
 }
 
@@ -72,7 +72,7 @@ func TestRenderIndex_NoError(t *testing.T) {
 	}
 }
 
-func TestRenderReview_ContainsTRID(t *testing.T) {
+func TestRenderReview_ContainsTRIDAndContent(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	out, err := tmpl.RenderReview(doneJob())
 	if err != nil {
@@ -80,6 +80,9 @@ func TestRenderReview_ContainsTRID(t *testing.T) {
 	}
 	if !strings.Contains(out, "NPLK900014") {
 		t.Error("review page must contain TRID")
+	}
+	if !strings.Contains(out, "LGTM") {
+		t.Error("review page must render ReviewHTML content inline, not just a link")
 	}
 }
 
