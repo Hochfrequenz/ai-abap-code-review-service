@@ -126,7 +126,7 @@
     // Register 'abap' as an alias for the vbscript grammar so hljs recognises
     // ```abap fences. Must run before any highlightAll() call.
     document.addEventListener('DOMContentLoaded', function() {
-      hljs.registerAliases({'vbscript': ['abap']});
+      hljs.registerAliases(['abap'], { languageName: 'vbscript' });
       hljs.highlightAll();
     });
   </script>
