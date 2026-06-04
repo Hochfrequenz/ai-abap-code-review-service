@@ -1,7 +1,66 @@
 # AI ABAP Code Review Service
 
-An AI-powered code review service for SAP ABAP, running on **SAP BTP Cloud Foundry**.
-Users submit a transport request ID via a web UI; a Claude agent autonomously fetches ABAP source objects from the on-premise SAP system via ADT, and returns a structured, printable markdown review.
+**AI-powered ABAP code review on SAP BTP — fork it, deploy it in an afternoon.**
+
+This service connects Claude (Anthropic's AI) to your SAP system's ADT API and reviews transport requests automatically: ATC findings, naming conventions, dependency analysis, code style.
+Review tone, depth, and language are fully customizable by editing Markdown files — no code changes required.
+It runs on SAP BTP Cloud Foundry alongside your existing services.
+There is no paid service or subscription; you bring your own Anthropic API key and pay Anthropic directly per use (~€0.20 per review with Claude Sonnet, ~€0.10 with Haiku; see [Anthropic pricing](https://www.anthropic.com/pricing)).
+
+<!-- DEMO GIF — see issue #40 -->
+*Demo GIF coming soon.*
+
+## Quick start
+
+**Prerequisites:**
+- SAP BTP subaccount with Cloud Foundry enabled + a CF user (SAP ID with CF org/space access)
+- SAP system with ADT enabled + a technical user with transport read authorizations
+  (`SAP_BC_TRANSPORT_ADMINISTRATOR` or equivalent — see [Operations notes](#operations-notes-hf-deployment)
+  for known authorization edge cases on S/4HANA)
+- Anthropic API key
+
+1. **Update `LICENSE` and `.github/CODEOWNERS`** — replace the Hochfrequenz copyright and team with your own.
+   The CI gate (`template-guards.yml`) enforces this and will fail until updated.
+
+2. **Fork and configure** — fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run:
+
+   ```bash
+   go run ./cmd/apply-config
+   ```
+
+   This rewrites module paths, Go import paths, manifest files, XSUAA security config, CF deploy workflow, and destination-name constants throughout the codebase automatically — you don't touch Go code. See `config.yml` for the full list of configurable fields.
+
+3. **Set repository secrets** — in your GitHub repository go to Settings → Secrets and variables → Actions and add:
+   - `ANTHROPIC_API_KEY` — your Anthropic API key
+   - `CF_USER` and `CF_PASSWORD` — your Cloud Foundry credentials
+
+   The CD pipeline reads these and sets them on the CF app automatically.
+
+4. **Initial deployment** — copy `vars.example.yml` to `vars.yml`, fill in your CF org/space/domain, then do a one-time manual push to create the CF app and bind services:
+
+   ```bash
+   make build-linux   # or: .\scripts\build.ps1 on Windows
+   cf push --vars-file vars.yml
+   ```
+
+5. **Ongoing updates** — publish a GitHub Release.
+   The CD pipeline (`.github/workflows/deploy.yml`) cross-compiles the binary, runs all checks, and pushes to CF automatically using your repository secrets.
+   Manual deployment from a developer machine is only needed for the initial setup.
+
+6. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
+
+## Customising the review prompts
+
+Beyond the infrastructure setup above, the review behaviour itself is configured entirely in Markdown — no Go code needed.
+
+The four built-in review styles are `review_pedantic.md`, `review_appreciative.md`, `review_analytical.md`, and `review_guidelines_hf.md` — all in `internal/agent/prompts/`.
+The file `review_guidelines_hf.md` contains Hochfrequenz-specific coding guidelines — replace it with your own organisation's standards or delete it (and remove its entry from `AllowedPrompts()` in `internal/agent/runner.go`).
+
+The shared procedure — which ADT tools to call, in which order, and what format to use — lives in `internal/agent/prompts/review_base.md`.
+All styles inherit it. Edit `review_base.md` to change the review language, add/remove ADT tools, or adjust the base instructions.
+
+For the underlying Go + SAP BTP Cloud Foundry template this service is built on,
+see [Hochfrequenz/go-sap-btp-cf-template](https://github.com/Hochfrequenz/go-sap-btp-cf-template).
 
 ## Architecture
 
@@ -10,7 +69,7 @@ flowchart LR
     Browser([Browser]) --> AR[SAP Approuter\nJWT login]
     AR -->|GET /| Go[Go backend · Gin\nHTMX UI + review API]
     AR -->|POST /api/reviews| Go
-    Go -->|tool calls| Agent[Claude Agent\nclaude-opus-4]
+    Go -->|tool calls| Agent[Claude Agent\nOpus / Sonnet / Haiku]
     Agent -->|ADT via adtler| DST[Destination Service]
     DST --> CC[Cloud Connector]
     CC -->|HTTPS + Basic Auth| SAP[On-premise SAP\nABAPADT]
@@ -29,16 +88,7 @@ We decided against it because aibap.mcp is a local stdio process: it cannot rece
 Integrating it would mean a second CF app and the same SOCKS5 transport-injection work — with no meaningful gain for the read-only scope we need.
 
 Direct wiring via [adtler](https://github.com/Hochfrequenz/adtler) (the Go ADT client library) keeps everything in a single CF app with BTP auth fully wired.
-See [issue #7](../../issues/7) for the full analysis; revisit if the SAP system moves to the cloud or write operations become in scope.
-
-## Quick start
-
-1. **If deploying your own instance:** fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run `go run ./cmd/apply-config` — see [#2](../../issues/2) for the full field list
-2. Set `ANTHROPIC_API_KEY` in your CF environment: `cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...`
-3. Customize the review prompt: edit `internal/agent/prompts/review_prompt.md`
-4. Run `go run ./cmd/apply-config` to rewrite the tree for your fork
-5. Cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then `cf push --vars-file vars.yml`
-6. Open `https://<app-name>-web.<domain>/` and enter a transport request number
+See [issue #7](https://github.com/Hochfrequenz/ai-abap-code-review-service/issues/7) for the full analysis; revisit if the SAP system moves to the cloud or write operations become in scope.
 
 ## Local development
 
@@ -49,16 +99,13 @@ This is intentional: there is no meaningful stub mode for the three-leg BTP danc
 
 Unit tests (`go test ./...`) run without any BTP or SAP credentials — they use fakes throughout.
 
-For integration tests against a real SAP system see [issue #6](../../issues/6) — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
+For integration tests against a real SAP system see [issue #6](https://github.com/Hochfrequenz/ai-abap-code-review-service/issues/6) — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
 
 ## How it works
 
 1. **Submit** — the user enters a transport request ID (e.g. `DEVK900123`) at `GET /`.
 2. **Create job** — `POST /api/reviews` validates the TR ID, creates an async review job, and returns a link to `GET /reviews/:id`.
-3. **Agent runs** — a Claude tool-use loop (`internal/agent/runner.go`) calls three ADT tools:
-   - `list_tr_objects` — lists all ABAP objects in the transport request
-   - `fetch_source` — fetches source for programs, interfaces, and classes
-   - `fetch_class_includes` — fetches class definitions, implementations, and test includes
+3. **Agent runs** — a Claude tool-use loop (`internal/agent/runner.go`) autonomously decides which ADT tools to call. Available tools include `list_tr_objects`, `fetch_source`, `fetch_class_includes`, `syntax_check`, `run_atc_check`, `get_object_info`, `diff_active_inactive`, `where_used`, and `get_version_history`. The review prompt (`internal/agent/prompts/review_base.md`) guides which tools to call and in what order.
 4. **Review ready** — the agent writes a structured markdown review.
    `GET /reviews/:id` polls every 3 s until the job is done, then renders printable HTML via goldmark.
 
@@ -73,11 +120,12 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 | Version | [/version](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version) |
 
 CI/CD: deployment is triggered by **publishing a GitHub Release** — not by push to `main`.
-The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` space in `HF Dev Account_hf-cf` on `eu10`, and smoke-tests `/healthz` and `/version`.
+The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` CF space on `eu10`, and smoke-tests `/healthz` and `/version`.
 
 ## Operations notes (HF deployment)
 
-Findings from first deployment — documented here so the next person doesn't have to rediscover them.
+The following findings are specific to the Hochfrequenz deployment and are kept here as a reference for the original operators and for forks that encounter similar environments.
+Your system may behave differently.
 
 ### Finding the SAP technical user
 
@@ -86,7 +134,6 @@ To see which user that is:
 
 > BTP cockpit → **Connectivity → Destinations → HF_S4** → Authentication section → **User** field
 
-Currently: **`metzej`**.
 The technical user should have `SAP_BC_TRANSPORT_ADMINISTRATOR` in SAP (SU01 → Roles tab) for general CTS access via ADT.
 However, adding this role alone does **not** fix the empty TR list — see the KORRDEV note below for the real root cause.
 
@@ -110,20 +157,21 @@ See [adtler issue #63](https://github.com/Hochfrequenz/adtler/issues/63) for the
 
 The health endpoint checks for required env vars at runtime.
 If the key is missing it returns `503 {"error":{"code":"internal","message":"server misconfigured: missing required environment variables: ANTHROPIC_API_KEY"}}` — this is intentional.
-Set the key via `cf set-env ai-abap-code-review-service ANTHROPIC_API_KEY sk-ant-...` then `cf restage`.
+Set the key via `cf set-env <your-app-name> ANTHROPIC_API_KEY sk-ant-...` then `cf restage`.
 
 ### JWT `user_name` is an email, not a SAP username
 
-The XSUAA JWT claim `user_name` contains the user's BTP email address (e.g. `konstantin.klein@hochfrequenz.de`).
-SAP CTS stores usernames as short login IDs (`METZEJ`, `KLEINK`).
+The XSUAA JWT claim `user_name` contains the user's BTP email address (e.g. `user@example.com`).
+SAP CTS stores usernames as short login IDs (e.g. `JDOE`).
 These cannot be mapped automatically — do not use `user_name` as a SAP user filter.
 
 ## Customisation
 
 | What | Where |
 | ---- | ----- |
-| Review prompt | `internal/agent/prompts/review_prompt.md` |
-| AI model | `reviewModel` constant in `internal/agent/runner.go` |
+| Review style | Select in the UI; edit `internal/agent/prompts/review_*.md` for tone/criteria/format |
+| Shared review procedure | `internal/agent/prompts/review_base.md` (tool-calling steps, ATC rule, code-block format) |
+| AI model | Select per review in the UI; models defined in `AllowedModels()` in `internal/agent/runner.go` |
 | Token budget | `reviewMaxTokens` constant in `internal/agent/runner.go` |
 | Persistence (swap in-memory store) | implement `reviewstore.JobStore` in `internal/reviewstore/store.go` |
 
