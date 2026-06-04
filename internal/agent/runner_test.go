@@ -117,12 +117,23 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	)
 
 	runner := agent.NewRunner(tools, claudeClient)
-	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	result, usage, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if !strings.Contains(result, "Code Review") {
 		t.Errorf("expected review text in result, got: %q", result)
+	}
+	// Token counts must accumulate across both loop iterations: 10+20=30 input, 5+15=20 output.
+	if usage.InputTokens != 30 {
+		t.Errorf("InputTokens: want 30, got %d", usage.InputTokens)
+	}
+	if usage.OutputTokens != 20 {
+		t.Errorf("OutputTokens: want 20, got %d", usage.OutputTokens)
+	}
+	// Cost: (30*15 + 20*75) / 1_000_000 = (450 + 1500) / 1_000_000 = 0.00195
+	if usage.EstimatedCostUSD < 0.001 || usage.EstimatedCostUSD > 0.01 {
+		t.Errorf("EstimatedCostUSD out of expected range: %f", usage.EstimatedCostUSD)
 	}
 	if len(calls) != 1 || calls[0] != "list_tr_objects" {
 		t.Errorf("expected list_tr_objects call, got: %v", calls)

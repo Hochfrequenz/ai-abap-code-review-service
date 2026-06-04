@@ -145,6 +145,9 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 
 		if resp.StopReason == anthropic.StopReasonEndTurn || resp.StopReason == "max_tokens" {
 			if p, ok := modelCostPerMillion[model]; ok {
+				// The Anthropic SDK returns disjoint token buckets: InputTokens is
+				// non-cached plain input; CacheCreationInputTokens and
+				// CacheReadInputTokens are separate. All three are priced independently.
 				usage.EstimatedCostUSD = (float64(usage.InputTokens)*p[0] +
 					float64(usage.OutputTokens)*p[1] +
 					float64(usage.CacheCreationTokens)*p[2] +
