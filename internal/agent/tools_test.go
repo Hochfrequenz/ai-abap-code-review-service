@@ -82,7 +82,8 @@ func TestListTRObjects_ReturnsObjectsWithURIs(t *testing.T) {
 	fake := &fakeADTClient{
 		trObjects: []adt.TransportObject{
 			{Type: "CLAS", Name: "ZCL_FOO"},
-			{Type: "FUGR", Name: "ZFUGR"}, // unsupported — URI will be empty
+			{Type: "FUGR", Name: "ZFUGR"},
+			{Type: "DTEL", Name: "ZDTEL"}, // unsupported — URI will be empty
 		},
 	}
 	tools := agent.NewTools(fake)
@@ -90,14 +91,17 @@ func TestListTRObjects_ReturnsObjectsWithURIs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTRObjects: %v", err)
 	}
-	if len(result) != 2 {
-		t.Fatalf("expected 2 objects, got %d", len(result))
+	if len(result) != 3 {
+		t.Fatalf("expected 3 objects, got %d", len(result))
 	}
 	if result[0].URI != "/sap/bc/adt/oo/classes/zcl_foo" {
-		t.Errorf("URI: got %q", result[0].URI)
+		t.Errorf("CLAS URI: got %q", result[0].URI)
 	}
-	if result[1].URI != "" {
-		t.Errorf("FUGR should have empty URI, got %q", result[1].URI)
+	if result[1].URI != "/sap/bc/adt/functions/groups/zfugr" {
+		t.Errorf("FUGR URI: got %q", result[1].URI)
+	}
+	if result[2].URI != "" {
+		t.Errorf("DTEL should have empty URI, got %q", result[2].URI)
 	}
 }
 
