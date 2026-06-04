@@ -22,8 +22,8 @@ type Prompt struct {
 func AllowedModels() map[string]string {
 	return map[string]string{
 		string(anthropic.ModelClaudeOpus4_8):           "Opus 4.8 (beste Qualität, &gt;1€/Review)",
-		string(anthropic.ModelClaudeSonnet4_6):         "Sonnet 4.6 (schneller, günstiger)",
-		string(anthropic.ModelClaudeHaiku4_5_20251001): "Haiku 4.5 (am schnellsten &amp; günstigsten)",
+		string(anthropic.ModelClaudeSonnet4_6):         "Sonnet 4.6 (~20 Ct/Review, schneller)",
+		string(anthropic.ModelClaudeHaiku4_5_20251001): "Haiku 4.5 (~10 Ct/Review, am schnellsten)",
 	}
 }
 
