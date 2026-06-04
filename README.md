@@ -36,7 +36,7 @@ and pay Anthropic directly per use (~$0.20 / ~€0.20 per review with Claude Son
    cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...
    ```
 
-3. **Build and deploy** — cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then:
+3. **Build and deploy** — copy `vars.example.yml` to `vars.yml` and fill in your values, cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then:
 
    ```bash
    cf push --vars-file vars.yml
@@ -51,9 +51,11 @@ This repo is designed to be forked. The only things you customize:
 - `config.yml` — your BTP coordinates, SAP system destination name, CF org/space
 - `internal/agent/prompts/review_*.md` — review tone, criteria, output format
   (plain Markdown, no Go). The file `review_guidelines_hf.md` contains
-  Hochfrequenz-specific coding guidelines — replace it with your own or delete it.
-- `internal/agent/prompts/review_base.md` — shared tool-calling procedure (optional;
-  only change this if you want to add or remove ADT tools from the review workflow)
+  Hochfrequenz-specific coding guidelines — replace it with your own or delete it
+  (and remove its entry from `AllowedPrompts()` in `internal/agent/runner.go`).
+- `internal/agent/prompts/review_base.md` — shared tool-calling procedure, review language,
+  and ATC severity rules (all styles inherit this). Edit here to change the review language,
+  add/remove ADT tools, or adjust the base instructions.
 
 Run `go run ./cmd/apply-config` once after editing `config.yml`. See `config.yml`
 for the full list of fields it rewrites across the codebase.
@@ -87,7 +89,7 @@ We decided against it because aibap.mcp is a local stdio process: it cannot rece
 Integrating it would mean a second CF app and the same SOCKS5 transport-injection work — with no meaningful gain for the read-only scope we need.
 
 Direct wiring via [adtler](https://github.com/Hochfrequenz/adtler) (the Go ADT client library) keeps everything in a single CF app with BTP auth fully wired.
-See [issue #7](../../issues/7) for the full analysis; revisit if the SAP system moves to the cloud or write operations become in scope.
+See [issue #7](https://github.com/Hochfrequenz/ai-abap-code-review-service/issues/7) for the full analysis; revisit if the SAP system moves to the cloud or write operations become in scope.
 
 ## Local development
 
@@ -98,16 +100,13 @@ This is intentional: there is no meaningful stub mode for the three-leg BTP danc
 
 Unit tests (`go test ./...`) run without any BTP or SAP credentials — they use fakes throughout.
 
-For integration tests against a real SAP system see [issue #6](../../issues/6) — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
+For integration tests against a real SAP system see [issue #6](https://github.com/Hochfrequenz/ai-abap-code-review-service/issues/6) — the `internal/agent/` tests can connect directly to SAP without the Cloud Connector, so only `SAP_INTEGRATION_*` env vars are needed, not a full BTP stack.
 
 ## How it works
 
 1. **Submit** — the user enters a transport request ID (e.g. `DEVK900123`) at `GET /`.
 2. **Create job** — `POST /api/reviews` validates the TR ID, creates an async review job, and returns a link to `GET /reviews/:id`.
-3. **Agent runs** — a Claude tool-use loop (`internal/agent/runner.go`) calls three ADT tools:
-   - `list_tr_objects` — lists all ABAP objects in the transport request
-   - `fetch_source` — fetches source for programs, interfaces, and classes
-   - `fetch_class_includes` — fetches class definitions, implementations, and test includes
+3. **Agent runs** — a Claude tool-use loop (`internal/agent/runner.go`) autonomously decides which ADT tools to call. Available tools include `list_tr_objects`, `fetch_source`, `fetch_class_includes`, `syntax_check`, `run_atc_check`, `get_object_info`, `diff_active_inactive`, `where_used`, and `get_version_history`. The review prompt (`internal/agent/prompts/review_base.md`) guides which tools to call and in what order.
 4. **Review ready** — the agent writes a structured markdown review.
    `GET /reviews/:id` polls every 3 s until the job is done, then renders printable HTML via goldmark.
 
@@ -122,7 +121,7 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 | Version | [/version](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version) |
 
 CI/CD: deployment is triggered by **publishing a GitHub Release** — not by push to `main`.
-The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` space in `HF Dev Account_hf-cf` on `eu10`, and smoke-tests `/healthz` and `/version`.
+The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` CF space on `eu10`, and smoke-tests `/healthz` and `/version`.
 
 ## Operations notes (HF deployment)
 
