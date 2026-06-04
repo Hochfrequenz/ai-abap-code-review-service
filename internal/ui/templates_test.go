@@ -72,7 +72,7 @@ func TestRenderIndex_NoError(t *testing.T) {
 	}
 }
 
-func TestRenderReview_ContainsTRID(t *testing.T) {
+func TestRenderReview_ContainsTRIDAndContent(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	out, err := tmpl.RenderReview(doneJob())
 	if err != nil {
@@ -80,6 +80,9 @@ func TestRenderReview_ContainsTRID(t *testing.T) {
 	}
 	if !strings.Contains(out, "NPLK900014") {
 		t.Error("review page must contain TRID")
+	}
+	if !strings.Contains(out, "LGTM") {
+		t.Error("review page must render ReviewHTML content inline, not just a link")
 	}
 }
 
