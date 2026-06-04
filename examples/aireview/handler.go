@@ -146,21 +146,22 @@ type openTR struct {
 	Description string `json:"description"`
 }
 
-// getTransportRequests returns all open (modifiable) transport requests as a JSON
-// array, sorted by number descending (newest first). The browser fetches this once
-// on page load and filters client-side — no round-trips needed while the user types.
-// On ADT error it returns an empty JSON array so the form stays usable.
+// getTransportRequests returns transport requests as a JSON array, sorted by
+// number descending (newest first). Accepts ?released=true to drop the TRSTATUS
+// filter entirely (returns all statuses: open, released, locked). The browser
+// fetches this once on page load and filters client-side. On ADT error returns
+// an empty JSON array.
 func getTransportRequests(lister TransportRequestLister) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if lister == nil {
 			c.JSON(http.StatusOK, []openTR{})
 			return
 		}
-		// Empty user = all users' open TRs ("D" = modifiable/open only).
-		// Implementation uses RunQuery on E070/E07T instead of the ADT transport
-		// organizer tree endpoint: the HF S/4 system uses KORRDEV="SYST"/"CUST"
-		// for its requests, which the organizer tree ignores (it only handles "K").
-		trs, err := lister.GetTransportRequests(c.Request.Context(), "", "D")
+		status := "D"
+		if c.Query("released") == "true" {
+			status = "" // empty = all statuses
+		}
+		trs, err := lister.GetTransportRequests(c.Request.Context(), "", status)
 		if err != nil {
 			slog.InfoContext(c.Request.Context(), "transport-requests fetch failed", "err", err)
 			c.JSON(http.StatusOK, []openTR{})

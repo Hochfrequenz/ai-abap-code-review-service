@@ -33,10 +33,13 @@ func (s *SQLTransportLister) GetTransportRequests(ctx context.Context, user, sta
 	// development — they clog the list and are never useful for code review.
 	// STRKORR = '' selects only top-level Transportaufträge (requests), not
 	// Transportaufgaben (tasks). Tasks have STRKORR pointing at their parent request.
-	where := "TRSTATUS = 'D' AND AS4USER <> 'SAP' AND STRKORR = ''"
-	if status == "L" {
-		where = "TRSTATUS = 'L' AND AS4USER <> 'SAP' AND STRKORR = ''"
-	} else if status != "" && status != "D" {
+	// status="" means all statuses; "D"=open only; "L"=locked only; "R"=released only.
+	// Whitelist guards against SQL injection through the public interface.
+	if status != "" && status != "D" && status != "L" && status != "R" {
+		return nil, fmt.Errorf("invalid transport status %q", status)
+	}
+	where := "AS4USER <> 'SAP' AND STRKORR = ''"
+	if status != "" {
 		where = fmt.Sprintf("TRSTATUS = '%s' AND AS4USER <> 'SAP' AND STRKORR = ''", status)
 	}
 	if user != "" {

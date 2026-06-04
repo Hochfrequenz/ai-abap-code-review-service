@@ -105,6 +105,10 @@
         list-style:none; z-index:10; box-shadow:0 4px 8px rgba(0,0,0,.1);
       "></ul>
     </div>
+    <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;font-size:.9rem;color:#555;cursor:pointer">
+      <input type="checkbox" id="show-released" style="cursor:pointer">
+      Auch freigegebene Transportaufträge anzeigen
+    </label>
     <label for="prompt">Rezensions-Stil</label>
     <select id="prompt" name="prompt">
       <option value="review_pedantic" selected>Pedantische Code-Review für erfahrene Entwickler*innen</option>
@@ -122,16 +126,19 @@
   </form>
   <div id="result"></div>
   <script>
-    // Load all open TRs once in the background; filter client-side as the user types.
-    // Filtering is case-insensitive and matches TR number, owner, or description.
+    // Load TRs in the background; filter client-side as the user types.
+    // The checkbox triggers a re-fetch with ?released=true to include released TRs.
     let allTRs = [];
-    fetch('/api/transport-requests')
-      .then(r => r.json())
-      .then(data => { allTRs = data; })
-      .catch(() => {});  // best-effort; form works without suggestions
 
     const input = document.getElementById('tr');
     const list  = document.getElementById('tr-suggestions');
+
+    function loadTRs() {
+      const released = document.getElementById('show-released').checked;
+      const url = '/api/transport-requests' + (released ? '?released=true' : '');
+      fetch(url).then(r => r.json()).then(data => { allTRs = data; showSuggestions(input.value); }).catch(() => {});
+    }
+    loadTRs();
 
     function showSuggestions(q) {
       if (!q || !allTRs.length) { list.style.display = 'none'; return; }
@@ -166,6 +173,7 @@
 
     input.addEventListener('input',  () => showSuggestions(input.value));
     input.addEventListener('focus',  () => showSuggestions(input.value));
+    document.getElementById('show-released').addEventListener('change', loadTRs);
     document.addEventListener('click', e => {
       if (!list.contains(e.target) && e.target !== input) list.style.display = 'none';
     });
