@@ -2,13 +2,10 @@
 
 **AI-powered ABAP code review on SAP BTP — fork it, deploy it in an afternoon.**
 
-This service connects Claude (Anthropic's AI) to your SAP system's ADT API and reviews
-transport requests automatically: ATC findings, naming conventions, dependency analysis,
-code style. Review tone, depth, and language are fully customizable by editing Markdown
-files — no code changes required. It runs on SAP BTP Cloud Foundry alongside your existing
-services. There is no paid service or subscription — you bring your own Anthropic API key
-and pay Anthropic directly per use (~$0.20 / ~€0.20 per review with Claude Sonnet,
-~$0.10 / ~€0.10 with Haiku; approximate, see [Anthropic pricing](https://www.anthropic.com/pricing)).
+This service connects Claude (Anthropic's AI) to your SAP system's ADT API and reviews transport requests automatically: ATC findings, naming conventions, dependency analysis, code style.
+Review tone, depth, and language are fully customizable by editing Markdown files — no code changes required.
+It runs on SAP BTP Cloud Foundry alongside your existing services.
+There is no paid service or subscription; you bring your own Anthropic API key and pay Anthropic directly per use (~€0.20 per review with Claude Sonnet, ~€0.10 with Haiku; see [Anthropic pricing](https://www.anthropic.com/pricing)).
 
 <!-- DEMO GIF — see issue #40 -->
 *Demo GIF coming soon.*
