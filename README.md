@@ -33,13 +33,18 @@ There is no paid service or subscription; you bring your own Anthropic API key a
 
    The CD pipeline reads these and sets them on the CF app automatically.
 
-3. **Build and deploy** — copy `vars.example.yml` to `vars.yml` and fill in your values, cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then:
+3. **Initial deployment** — copy `vars.example.yml` to `vars.yml`, fill in your CF org/space/domain, then do a one-time manual push to create the CF app and bind services:
 
    ```bash
+   make build-linux   # or: .\scripts\build.ps1 on Windows
    cf push --vars-file vars.yml
    ```
 
-4. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
+4. **Ongoing updates** — publish a GitHub Release.
+   The CD pipeline (`.github/workflows/deploy.yml`) cross-compiles the binary, runs all checks, and pushes to CF automatically using your repository secrets.
+   Manual deployment from a developer machine is only needed for the initial setup.
+
+5. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
 
 ## Forking this template
 
