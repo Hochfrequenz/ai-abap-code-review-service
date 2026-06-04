@@ -19,6 +19,17 @@ bleiben auf Englisch.
 11. Enthält der Transport keine prüfbaren Objekte (alle URIs leer), schreibe, dass keine prüfbaren Quellobjekte vorhanden sind.
 12. Schreibe nach dem Sammeln aller Informationen das Review gemäß dem unten stehenden Stil und Format.
 
+## Code-Zitate
+
+Zitiere ABAP-Quellcode immer in einem Codeblock mit Sprachkennung:
+
+```abap
+" Beispiel
+DATA lv_wert TYPE i.
+```
+
+Verwende ausschließlich ` ```abap ` — nie nur ` ``` ` ohne Sprachkennung.
+
 ## Allgemeine ATC-Regel
 
 Die ATC-Befunde von `run_atc_check` sind immer der erste Abschnitt des Reviews.
