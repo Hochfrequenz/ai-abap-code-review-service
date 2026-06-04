@@ -1,7 +1,65 @@
 # AI ABAP Code Review Service
 
-An AI-powered code review service for SAP ABAP, running on **SAP BTP Cloud Foundry**.
-Users submit a transport request ID via a web UI; a Claude agent autonomously fetches ABAP source objects from the on-premise SAP system via ADT, and returns a structured, printable markdown review.
+**AI-powered ABAP code review on SAP BTP — fork it, deploy it in an afternoon.**
+
+This service connects Claude (Anthropic's AI) to your SAP system's ADT API and reviews
+transport requests automatically: ATC findings, naming conventions, dependency analysis,
+code style. Review tone, depth, and language are fully customizable by editing Markdown
+files — no code changes required. It runs on SAP BTP Cloud Foundry alongside your existing
+services. There is no paid service or subscription — you bring your own Anthropic API key
+and pay Anthropic directly per use (~$0.20 / ~€0.20 per review with Claude Sonnet,
+~$0.10 / ~€0.10 with Haiku; approximate, see [Anthropic pricing](https://www.anthropic.com/pricing)).
+
+<!-- DEMO GIF — see issue #40 -->
+*Demo GIF coming soon.*
+
+## Quick start
+
+**Prerequisites:**
+- SAP BTP subaccount with Cloud Foundry enabled + a CF user (SAP ID with CF org/space access)
+- SAP system with ADT enabled + a technical user with transport read authorizations
+  (`SAP_BC_TRANSPORT_ADMINISTRATOR` or equivalent — see [Operations notes](#operations-notes-hf-deployment)
+  for known authorization edge cases on S/4HANA)
+- Anthropic API key
+
+1. **Fork and configure** — fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run:
+
+   ```bash
+   go run ./cmd/apply-config
+   ```
+
+   This rewrites module paths, Go import paths, manifest files, XSUAA security config, CF deploy workflow, and destination-name constants throughout the codebase automatically — you don't touch Go code. See `config.yml` for the full list of configurable fields.
+
+2. **Set the API key** in your CF environment:
+
+   ```bash
+   cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...
+   ```
+
+3. **Build and deploy** — cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then:
+
+   ```bash
+   cf push --vars-file vars.yml
+   ```
+
+4. **Open** `https://<app-name>-web.<domain>/` and enter a transport request number.
+
+## Forking this template
+
+This repo is designed to be forked. The only things you customize:
+
+- `config.yml` — your BTP coordinates, SAP system destination name, CF org/space
+- `internal/agent/prompts/review_*.md` — review tone, criteria, output format
+  (plain Markdown, no Go). The file `review_guidelines_hf.md` contains
+  Hochfrequenz-specific coding guidelines — replace it with your own or delete it.
+- `internal/agent/prompts/review_base.md` — shared tool-calling procedure (optional;
+  only change this if you want to add or remove ADT tools from the review workflow)
+
+Run `go run ./cmd/apply-config` once after editing `config.yml`. See `config.yml`
+for the full list of fields it rewrites across the codebase.
+
+For the underlying Go + SAP BTP Cloud Foundry template this service is built on,
+see [Hochfrequenz/go-sap-btp-cf-template](https://github.com/Hochfrequenz/go-sap-btp-cf-template).
 
 ## Architecture
 
@@ -10,7 +68,7 @@ flowchart LR
     Browser([Browser]) --> AR[SAP Approuter\nJWT login]
     AR -->|GET /| Go[Go backend · Gin\nHTMX UI + review API]
     AR -->|POST /api/reviews| Go
-    Go -->|tool calls| Agent[Claude Agent\nclaude-opus-4]
+    Go -->|tool calls| Agent[Claude Agent\nOpus / Sonnet / Haiku]
     Agent -->|ADT via adtler| DST[Destination Service]
     DST --> CC[Cloud Connector]
     CC -->|HTTPS + Basic Auth| SAP[On-premise SAP\nABAPADT]
@@ -30,15 +88,6 @@ Integrating it would mean a second CF app and the same SOCKS5 transport-injectio
 
 Direct wiring via [adtler](https://github.com/Hochfrequenz/adtler) (the Go ADT client library) keeps everything in a single CF app with BTP auth fully wired.
 See [issue #7](../../issues/7) for the full analysis; revisit if the SAP system moves to the cloud or write operations become in scope.
-
-## Quick start
-
-1. **If deploying your own instance:** fill in `config.yml` (`app.name`, `app.module`, `cf.*`, `examples.destination_name`, `examples.sap_client`) and run `go run ./cmd/apply-config` — see [#2](../../issues/2) for the full field list
-2. Set `ANTHROPIC_API_KEY` in your CF environment: `cf set-env <app-name> ANTHROPIC_API_KEY sk-ant-...`
-3. Customize the review prompt: edit `internal/agent/prompts/review_prompt.md`
-4. Run `go run ./cmd/apply-config` to rewrite the tree for your fork
-5. Cross-compile the binary (`make build-linux` or `.\scripts\build.ps1`), then `cf push --vars-file vars.yml`
-6. Open `https://<app-name>-web.<domain>/` and enter a transport request number
 
 ## Local development
 
@@ -86,7 +135,6 @@ To see which user that is:
 
 > BTP cockpit → **Connectivity → Destinations → HF_S4** → Authentication section → **User** field
 
-Currently: **`metzej`**.
 The technical user should have `SAP_BC_TRANSPORT_ADMINISTRATOR` in SAP (SU01 → Roles tab) for general CTS access via ADT.
 However, adding this role alone does **not** fix the empty TR list — see the KORRDEV note below for the real root cause.
 
@@ -114,16 +162,17 @@ Set the key via `cf set-env ai-abap-code-review-service ANTHROPIC_API_KEY sk-ant
 
 ### JWT `user_name` is an email, not a SAP username
 
-The XSUAA JWT claim `user_name` contains the user's BTP email address (e.g. `konstantin.klein@hochfrequenz.de`).
-SAP CTS stores usernames as short login IDs (`METZEJ`, `KLEINK`).
+The XSUAA JWT claim `user_name` contains the user's BTP email address (e.g. `user@example.com`).
+SAP CTS stores usernames as short login IDs (e.g. `JDOE`).
 These cannot be mapped automatically — do not use `user_name` as a SAP user filter.
 
 ## Customisation
 
 | What | Where |
 | ---- | ----- |
-| Review prompt | `internal/agent/prompts/review_prompt.md` |
-| AI model | `reviewModel` constant in `internal/agent/runner.go` |
+| Review style | Select in the UI; edit `internal/agent/prompts/review_*.md` for tone/criteria/format |
+| Shared review procedure | `internal/agent/prompts/review_base.md` (tool-calling steps, ATC rule, code-block format) |
+| AI model | Select per review in the UI; models defined in `AllowedModels()` in `internal/agent/runner.go` |
 | Token budget | `reviewMaxTokens` constant in `internal/agent/runner.go` |
 | Persistence (swap in-memory store) | implement `reviewstore.JobStore` in `internal/reviewstore/store.go` |
 
