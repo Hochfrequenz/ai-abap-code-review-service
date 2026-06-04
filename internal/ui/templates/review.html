@@ -122,7 +122,16 @@
 <body>
   <nav><a href="/">← Neue Review</a></nav>
   <div id="status">
+  {{- if eq .Status "done" -}}
+    <article class="review">{{.ReviewHTML | safeHTML}}</article>
+    <div class="token-usage">
+      <span>Token: {{.Usage.InputTokens}} ein / {{.Usage.OutputTokens}} aus{{if .Usage.CacheReadTokens}} / {{.Usage.CacheReadTokens}} Cache-Treffer{{end}}</span>
+      {{- if .Usage.EstimatedCostUSD}}<span> · ca. ${{printf "%.4f" .Usage.EstimatedCostUSD}} (Schätzung)</span>{{end}}
+    </div>
+    <button class="print-btn" onclick="window.print()">Drucken / Als PDF speichern</button>
+  {{- else -}}
     {{template "_status.html" .}}
+  {{- end -}}
   </div>
 </body>
 </html>
