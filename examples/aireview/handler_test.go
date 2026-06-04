@@ -384,6 +384,52 @@ func TestGetTransportRequests_ADTError_ReturnsEmptyArray(t *testing.T) {
 	}
 }
 
+type capturingLister struct {
+	capturedStatus string
+	requests       []adt.TransportRequest
+}
+
+func (f *capturingLister) GetTransportRequests(_ context.Context, _, status string) ([]adt.TransportRequest, error) {
+	f.capturedStatus = status
+	return f.requests, nil
+}
+
+func TestGetTransportRequests_DefaultPath_PassesStatusD(t *testing.T) {
+	lister := &capturingLister{}
+	store := newFakeStore("00000000-0000-0000-0000-000000000014")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouterWithLister(store, &fakeRunner{}, lister, tmpl)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/transport-requests", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200", w.Code)
+	}
+	if lister.capturedStatus != "D" {
+		t.Errorf("default path must pass status %q, got %q", "D", lister.capturedStatus)
+	}
+}
+
+func TestGetTransportRequests_ReleasedTrue_PassesEmptyStatus(t *testing.T) {
+	lister := &capturingLister{}
+	store := newFakeStore("00000000-0000-0000-0000-000000000015")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouterWithLister(store, &fakeRunner{}, lister, tmpl)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/transport-requests?released=true", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200", w.Code)
+	}
+	if lister.capturedStatus != "" {
+		t.Errorf("released=true must pass empty status, got %q", lister.capturedStatus)
+	}
+}
+
 func TestGetTransportRequests_NilLister_ReturnsEmptyArray(t *testing.T) {
 	store := newFakeStore("00000000-0000-0000-0000-000000000012")
 	tmpl := ui.MustLoadTemplates()

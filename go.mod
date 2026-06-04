@@ -3,11 +3,11 @@ module github.com/hochfrequenz/ai-abap-code-review-service
 go 1.26
 
 require (
-	github.com/Hochfrequenz/adtler v0.2.2
+	github.com/Hochfrequenz/adtler v0.2.3
+	github.com/Hochfrequenz/sap-mcp-config v1.0.0
 	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/anthropics/anthropic-sdk-go v1.46.0
 	github.com/corbym/gocrest v1.2.1
-	github.com/danielgtaylor/huma/v2 v2.38.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -17,7 +17,6 @@ require (
 )
 
 require (
-	github.com/Hochfrequenz/sap-mcp-config v1.0.0 // indirect
 	github.com/MicahParks/jwkset v0.11.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
@@ -43,6 +42,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
