@@ -92,6 +92,9 @@ func (t *Tools) FetchSource(ctx context.Context, objectURI string) (string, erro
 // FORM-based report was reviewed against a hallucinated class structure.
 func annotateLineNumbers(src string) string {
 	lines := strings.Split(src, "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
 	for i, line := range lines {
 		lines[i] = fmt.Sprintf("%d | %s", i+1, line)
 	}
