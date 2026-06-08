@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Hochfrequenz/adtler/adt"
 )
@@ -72,13 +73,29 @@ func (t *Tools) ListTRObjects(ctx context.Context, trID string) ([]TRObject, err
 	return out, nil
 }
 
-// FetchSource returns the main source code for any PROG/CLAS/INTF object URI.
+// FetchSource returns the main source code for any PROG/CLAS/INTF object URI,
+// annotated with 1-based line numbers (see annotateLineNumbers).
 func (t *Tools) FetchSource(ctx context.Context, objectURI string) (string, error) {
 	res, err := t.client.GetSource(ctx, objectURI)
 	if err != nil {
 		return "", fmt.Errorf("fetch source %q: %w", objectURI, err)
 	}
-	return res.Source, nil
+	return annotateLineNumbers(res.Source), nil
+}
+
+// annotateLineNumbers prefixes each line of src with its 1-based line number,
+// e.g. "12 | DATA lv_x TYPE i.". The numbers are counted from the fetched
+// source, which starts at line 1, so they line up with the SE38/ADT editor and
+// with the line numbers reported by run_atc_check and syntax_check. This grounds
+// the review: every finding can cite a concrete line. Without these anchors the
+// model is free to describe code that was never fetched — see issue #42, where a
+// FORM-based report was reviewed against a hallucinated class structure.
+func annotateLineNumbers(src string) string {
+	lines := strings.Split(src, "\n")
+	for i, line := range lines {
+		lines[i] = fmt.Sprintf("%d | %s", i+1, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // SyntaxCheck runs an ADT syntax check on the saved object at objectURI.
@@ -162,7 +179,7 @@ func (t *Tools) FetchClassIncludes(ctx context.Context, classURI string) (map[st
 		if err != nil {
 			continue // absent include on this SAP system — not an error
 		}
-		out[inc] = res.Source
+		out[inc] = annotateLineNumbers(res.Source)
 	}
 	return out, nil
 }

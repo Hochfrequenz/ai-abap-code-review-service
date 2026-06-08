@@ -389,7 +389,7 @@ func (r *Runner) buildToolDefs() []anthropic.ToolUnionParam {
 		{
 			OfTool: &anthropic.ToolParam{
 				Name:        "fetch_source",
-				Description: anthropic.String("Fetch the main ABAP source code for an object using its ADT URI."),
+				Description: anthropic.String("Fetch the main ABAP source code for an object using its ADT URI. Each line is prefixed with its 1-based line number (format \"<n> | <code>\"); cite these line numbers in your findings."),
 				InputSchema: anthropic.ToolInputSchemaParam{
 					Properties: map[string]any{
 						"object_uri": map[string]any{"type": "string", "description": "The ADT URI of the object, e.g. /sap/bc/adt/oo/classes/zcl_example"},
@@ -401,7 +401,7 @@ func (r *Runner) buildToolDefs() []anthropic.ToolUnionParam {
 		{
 			OfTool: &anthropic.ToolParam{
 				Name:        "fetch_class_includes",
-				Description: anthropic.String("Fetch all available include sections of an ABAP class (definitions, implementations, testclasses, macros). Returns a map of include name to source code."),
+				Description: anthropic.String("Fetch all available include sections of an ABAP class (definitions, implementations, testclasses, macros). Returns a map of include name to source code; each line is prefixed with its 1-based line number (format \"<n> | <code>\"), counted per include."),
 				InputSchema: anthropic.ToolInputSchemaParam{
 					Properties: map[string]any{
 						"class_uri": map[string]any{"type": "string", "description": "The ADT URI of the class, e.g. /sap/bc/adt/oo/classes/zcl_example"},

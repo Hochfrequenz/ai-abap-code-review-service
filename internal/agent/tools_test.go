@@ -116,7 +116,7 @@ func TestFetchSource_ReturnsSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchSource: %v", err)
 	}
-	if src != "CLASS zcl_foo DEFINITION." {
+	if src != "1 | CLASS zcl_foo DEFINITION." {
 		t.Errorf("source: got %q", src)
 	}
 }
@@ -256,10 +256,10 @@ func TestFetchClassIncludes_ReturnsAvailableIncludes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchClassIncludes: %v", err)
 	}
-	if result["definitions"] != "DEFINITION content" {
+	if result["definitions"] != "1 | DEFINITION content" {
 		t.Errorf("definitions: got %q", result["definitions"])
 	}
-	if result["implementations"] != "IMPLEMENTATION content" {
+	if result["implementations"] != "1 | IMPLEMENTATION content" {
 		t.Errorf("implementations: got %q", result["implementations"])
 	}
 	if _, ok := result["testclasses"]; ok {

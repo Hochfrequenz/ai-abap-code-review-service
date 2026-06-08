@@ -19,6 +19,23 @@ bleiben auf Englisch.
 11. Enthält der Transport keine prüfbaren Objekte (alle URIs leer), schreibe, dass keine prüfbaren Quellobjekte vorhanden sind.
 12. Schreibe nach dem Sammeln aller Informationen das Review gemäß dem unten stehenden Stil und Format.
 
+## Faktentreue (zwingend)
+
+Beschreibe ausschließlich Code, der tatsächlich von `fetch_source` bzw.
+`fetch_class_includes` zurückgegeben wurde. Erfinde oder unterstelle keine
+Klassen, Methoden, FORM-Routinen, Variablen, Parameter, Konstanten oder
+sonstigen Strukturen, die im abgerufenen Quelltext nicht vorkommen.
+
+- Jeder Befund muss sich auf real abgerufenen Quelltext beziehen. Der Quelltext
+  ist zeilenweise mit Zeilennummern annotiert (Format `<Nr> | <Code>`); nenne
+  bei jedem Befund die betroffene Zeilennummer.
+- Bewerte ausschließlich die tatsächlich vorhandene Programmstruktur. Verwendet
+  das Programm FORM/PERFORM und globale Variablen statt Klassen, dann prüfe
+  genau diese FORM-Routinen und Variablen — refaktoriere den Code nicht
+  gedanklich in eine Klassenstruktur und bewerte dann diese erfundene Fassung.
+- Kannst du eine Aussage nicht an einer konkreten, abgerufenen Zeile festmachen,
+  triff sie nicht.
+
 ## Code-Zitate
 
 Zitiere ABAP-Quellcode immer in einem Codeblock mit Sprachkennung:
