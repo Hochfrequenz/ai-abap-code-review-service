@@ -3,17 +3,17 @@ module github.com/hochfrequenz/ai-abap-code-review-service
 go 1.26
 
 require (
-	github.com/Hochfrequenz/adtler v0.2.3
+	github.com/Hochfrequenz/adtler v0.2.4
 	github.com/Hochfrequenz/sap-mcp-config v1.0.0
 	github.com/MicahParks/keyfunc/v3 v3.8.0
-	github.com/anthropics/anthropic-sdk-go v1.48.0
+	github.com/anthropics/anthropic-sdk-go v1.50.2
 	github.com/corbym/gocrest v1.2.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/yuin/goldmark v1.8.2
-	golang.org/x/sync v0.20.0
+	golang.org/x/sync v0.21.0
 )
 
 require (

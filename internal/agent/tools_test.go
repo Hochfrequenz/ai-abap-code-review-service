@@ -108,7 +108,7 @@ func TestListTRObjects_ReturnsObjectsWithURIs(t *testing.T) {
 func TestFetchSource_ReturnsSource(t *testing.T) {
 	fake := &fakeADTClient{
 		sources: map[string]string{
-			"/sap/bc/adt/oo/classes/zcl_foo": "CLASS zcl_foo DEFINITION.",
+			"/sap/bc/adt/oo/classes/zcl_foo": "CLASS zcl_foo DEFINITION.\n  PUBLIC SECTION.\n",
 		},
 	}
 	tools := agent.NewTools(fake)
@@ -116,7 +116,7 @@ func TestFetchSource_ReturnsSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchSource: %v", err)
 	}
-	if src != "1 | CLASS zcl_foo DEFINITION." {
+	if src != "1 | CLASS zcl_foo DEFINITION.\n2 |   PUBLIC SECTION." {
 		t.Errorf("source: got %q", src)
 	}
 }

@@ -101,7 +101,7 @@ func annotateLineNumbers(src string) string {
 	// (strings.Split("A\n", "\n") == ["A", ""]). Drop it so we don't number a
 	// phantom line the editor never shows — which would also break the claimed
 	// alignment with run_atc_check / syntax_check line numbers.
-	if len(lines) > 1 && lines[len(lines)-1] == "" {
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
 	for i, line := range lines {
