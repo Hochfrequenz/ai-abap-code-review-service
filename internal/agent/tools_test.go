@@ -121,6 +121,29 @@ func TestFetchSource_ReturnsSource(t *testing.T) {
 	}
 }
 
+// TestFetchSource_AnnotatesMultilineWithTrailingNewline guards the line-number
+// annotation against two regressions: a trailing newline must not be numbered as
+// a phantom extra line, and CRLF line endings must not leave a stray \r on the
+// annotated line. Both would break the claimed alignment with the editor and
+// with run_atc_check / syntax_check line numbers.
+func TestFetchSource_AnnotatesMultilineWithTrailingNewline(t *testing.T) {
+	fake := &fakeADTClient{
+		sources: map[string]string{
+			// Mixed CRLF/LF endings plus a trailing newline.
+			"/sap/bc/adt/programs/programs/z_x": "REPORT z_x.\r\nWRITE 'hi'.\n",
+		},
+	}
+	tools := agent.NewTools(fake)
+	src, err := tools.FetchSource(context.Background(), "/sap/bc/adt/programs/programs/z_x")
+	if err != nil {
+		t.Fatalf("FetchSource: %v", err)
+	}
+	want := "1 | REPORT z_x.\n2 | WRITE 'hi'."
+	if src != want {
+		t.Errorf("source:\n got %q\nwant %q", src, want)
+	}
+}
+
 func TestFetchClassIncludes_CancelledContext_ReturnsError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already cancelled

@@ -91,7 +91,19 @@ func (t *Tools) FetchSource(ctx context.Context, objectURI string) (string, erro
 // model is free to describe code that was never fetched — see issue #42, where a
 // FORM-based report was reviewed against a hallucinated class structure.
 func annotateLineNumbers(src string) string {
+	// ADT may return CRLF (or lone CR) line endings; normalise to "\n" first so
+	// the line count matches the SE38/ADT editor and no stray carriage return
+	// hangs off the end of an annotated line.
+	src = strings.ReplaceAll(src, "\r\n", "\n")
+	src = strings.ReplaceAll(src, "\r", "\n")
 	lines := strings.Split(src, "\n")
+	// A trailing newline makes Split emit a final empty element
+	// (strings.Split("A\n", "\n") == ["A", ""]). Drop it so we don't number a
+	// phantom line the editor never shows — which would also break the claimed
+	// alignment with run_atc_check / syntax_check line numbers.
+	if len(lines) > 1 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
 	for i, line := range lines {
 		lines[i] = fmt.Sprintf("%d | %s", i+1, line)
 	}
