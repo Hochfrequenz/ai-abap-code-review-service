@@ -108,7 +108,7 @@ func TestListTRObjects_ReturnsObjectsWithURIs(t *testing.T) {
 func TestFetchSource_ReturnsSource(t *testing.T) {
 	fake := &fakeADTClient{
 		sources: map[string]string{
-			"/sap/bc/adt/oo/classes/zcl_foo": "CLASS zcl_foo DEFINITION.",
+			"/sap/bc/adt/oo/classes/zcl_foo": "CLASS zcl_foo DEFINITION.\n  PUBLIC SECTION.\n",
 		},
 	}
 	tools := agent.NewTools(fake)
@@ -116,8 +116,31 @@ func TestFetchSource_ReturnsSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchSource: %v", err)
 	}
-	if src != "CLASS zcl_foo DEFINITION." {
+	if src != "1 | CLASS zcl_foo DEFINITION.\n2 |   PUBLIC SECTION." {
 		t.Errorf("source: got %q", src)
+	}
+}
+
+// TestFetchSource_AnnotatesMultilineWithTrailingNewline guards the line-number
+// annotation against two regressions: a trailing newline must not be numbered as
+// a phantom extra line, and CRLF line endings must not leave a stray \r on the
+// annotated line. Both would break the claimed alignment with the editor and
+// with run_atc_check / syntax_check line numbers.
+func TestFetchSource_AnnotatesMultilineWithTrailingNewline(t *testing.T) {
+	fake := &fakeADTClient{
+		sources: map[string]string{
+			// Mixed CRLF/LF endings plus a trailing newline.
+			"/sap/bc/adt/programs/programs/z_x": "REPORT z_x.\r\nWRITE 'hi'.\n",
+		},
+	}
+	tools := agent.NewTools(fake)
+	src, err := tools.FetchSource(context.Background(), "/sap/bc/adt/programs/programs/z_x")
+	if err != nil {
+		t.Fatalf("FetchSource: %v", err)
+	}
+	want := "1 | REPORT z_x.\n2 | WRITE 'hi'."
+	if src != want {
+		t.Errorf("source:\n got %q\nwant %q", src, want)
 	}
 }
 
@@ -256,10 +279,10 @@ func TestFetchClassIncludes_ReturnsAvailableIncludes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchClassIncludes: %v", err)
 	}
-	if result["definitions"] != "DEFINITION content" {
+	if result["definitions"] != "1 | DEFINITION content" {
 		t.Errorf("definitions: got %q", result["definitions"])
 	}
-	if result["implementations"] != "IMPLEMENTATION content" {
+	if result["implementations"] != "1 | IMPLEMENTATION content" {
 		t.Errorf("implementations: got %q", result["implementations"])
 	}
 	if _, ok := result["testclasses"]; ok {
