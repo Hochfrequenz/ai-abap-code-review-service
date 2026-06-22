@@ -119,8 +119,13 @@ ADT calls travel through the BTP Connectivity SOCKS5 proxy to the on-premise SAP
 | Health | [/healthz](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/healthz) |
 | Version | [/version](https://ai-abap-code-review-service.cfapps.eu10.hana.ondemand.com/version) |
 
-CI/CD: deployment is triggered by **publishing a GitHub Release** — not by push to `main`.
-The workflow (`.github/workflows/deploy.yml`) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` CF space on `eu10`, and smoke-tests `/healthz` and `/version`.
+CI/CD: deployment is triggered by [publishing a new GitHub Release](https://github.com/Hochfrequenz/ai-abap-code-review-service/releases/new) — not by push to `main`.
+The workflow ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) cross-compiles the binary, runs the full gate (test + lint + fmt), pushes to the `dev` CF space on `eu10`, and smoke-tests `/healthz` and `/version`.
+
+> [!WARNING]
+> As of 2026-06-22 the re-deployment and any restart of the application truncate existing reviews.
+> This is because there is no persistence layer yet:
+> All review results live in RAM only and are lost when the server application restarts.
 
 ## Operations notes (HF deployment)
 
