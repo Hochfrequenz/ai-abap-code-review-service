@@ -243,6 +243,36 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 	}
 }
 
+func TestRunner_ConcatenatesTextBlocksBeforePreambleStripping(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewDecoder(r.Body).Decode(&map[string]any{})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": "claude-opus-4-8", "stop_reason": "end_turn",
+			"content": []map[string]any{
+				{"type": "text", "text": "Ich habe nun alle Quelltexte gesammelt."},
+				{"type": "text", "text": "\n\n## Zusammenfassung\nAlles gut."},
+			},
+			"usage": map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	if err != nil {
+		t.Fatalf("expected result not error, got: %v", err)
+	}
+	if result != "## Zusammenfassung\nAlles gut." {
+		t.Errorf("unexpected result: %q", result)
+	}
+}
+
 func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

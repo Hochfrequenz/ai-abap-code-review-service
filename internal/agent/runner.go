@@ -159,16 +159,20 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 					float64(usage.CacheCreationTokens)*p[2] +
 					float64(usage.CacheReadTokens)*p[3]) / 1_000_000
 			}
+			var textBlocks string
 			for _, block := range resp.Content {
 				if block.Type == "text" {
-					// Drop any preamble/narration the model emitted before the
-					// first "## " section — the title is rendered by the UI layer.
-					text := stripModelPreamble(block.Text)
-					if resp.StopReason == "max_tokens" {
-						text += "\n\n---\n*Review truncated: output token limit reached.*"
-					}
-					return text, usage, nil
+					textBlocks += block.Text
 				}
+			}
+			if textBlocks != "" {
+				// Drop any preamble/narration the model emitted before the
+				// first "## " section — the title is rendered by the UI layer.
+				text := stripModelPreamble(textBlocks)
+				if resp.StopReason == "max_tokens" {
+					text += "\n\n---\n*Review truncated: output token limit reached.*"
+				}
+				return text, usage, nil
 			}
 			return "", usage, fmt.Errorf("no text block in response (stop_reason: %s)", resp.StopReason)
 		}
