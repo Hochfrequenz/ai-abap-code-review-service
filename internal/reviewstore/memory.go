@@ -22,12 +22,16 @@ func NewMemoryStore() JobStore {
 	return &memoryStore{jobs: make(map[string]*Job)}
 }
 
-func (s *memoryStore) Create(_ context.Context, trID string) (*Job, error) {
+func (s *memoryStore) Create(_ context.Context, meta JobMeta) (*Job, error) {
 	job := &Job{
-		ID:        uuid.New().String(),
-		TRID:      trID,
-		Status:    JobStatusPending,
-		CreatedAt: time.Now(),
+		ID:          uuid.New().String(),
+		TRID:        meta.TRID,
+		TRTitle:     meta.TRTitle,
+		TRAuthor:    meta.TRAuthor,
+		ModelLabel:  meta.ModelLabel,
+		PromptLabel: meta.PromptLabel,
+		Status:      JobStatusPending,
+		CreatedAt:   time.Now(),
 	}
 	s.mu.Lock()
 	s.jobs[job.ID] = job

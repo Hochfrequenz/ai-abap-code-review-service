@@ -201,6 +201,19 @@
       list.style.display = 'block';
     }
 
+    // Attach the selected TR's title + owner to the review request. The full TR
+    // list is already loaded client-side, so this works whether the user clicked
+    // a suggestion or typed the number by hand. If the typed number isn't in the
+    // loaded list (e.g. a released TR with the checkbox off), the fields stay
+    // empty and the server renders the header without them.
+    document.body.addEventListener('htmx:configRequest', function(evt) {
+      if (evt.detail.path !== '/api/reviews') return;
+      const q = (input.value || '').trim().toUpperCase();
+      const tr = allTRs.find(t => t.number.toUpperCase() === q);
+      evt.detail.parameters['tr_title']  = tr ? tr.description : '';
+      evt.detail.parameters['tr_author'] = tr ? tr.owner : '';
+    });
+
     input.addEventListener('input',  () => showSuggestions(input.value));
     input.addEventListener('focus',  () => showSuggestions(input.value));
     document.getElementById('show-released').addEventListener('change', loadTRs);

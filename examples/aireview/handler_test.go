@@ -39,8 +39,12 @@ func newFakeStore(jobID string) *fakeStore {
 	}
 }
 
-func (f *fakeStore) Create(_ context.Context, trID string) (*reviewstore.Job, error) {
-	f.job.TRID = trID
+func (f *fakeStore) Create(_ context.Context, meta reviewstore.JobMeta) (*reviewstore.Job, error) {
+	f.job.TRID = meta.TRID
+	f.job.TRTitle = meta.TRTitle
+	f.job.TRAuthor = meta.TRAuthor
+	f.job.ModelLabel = meta.ModelLabel
+	f.job.PromptLabel = meta.PromptLabel
 	return f.job, nil
 }
 func (f *fakeStore) Get(_ context.Context, _ string) (*reviewstore.Job, error) {

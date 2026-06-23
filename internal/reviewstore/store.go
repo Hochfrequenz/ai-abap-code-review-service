@@ -25,19 +25,39 @@ type TokenUsage struct {
 	EstimatedCostUSD    float64
 }
 
+// Job is one review job and its result. TRTitle, TRAuthor, ModelLabel and
+// PromptLabel are display-only metadata captured at creation time (see JobMeta)
+// and rendered in the review header; ModelLabel is plain text (not HTML-encoded).
 type Job struct {
-	ID         string
-	TRID       string
-	Status     JobStatus
-	ReviewHTML string
-	ErrMsg     string
-	Usage      TokenUsage
-	CreatedAt  time.Time
-	FinishedAt *time.Time
+	ID          string
+	TRID        string
+	TRTitle     string
+	TRAuthor    string
+	ModelLabel  string
+	PromptLabel string
+	Status      JobStatus
+	ReviewHTML  string
+	ErrMsg      string
+	Usage       TokenUsage
+	CreatedAt   time.Time
+	FinishedAt  *time.Time
+}
+
+// JobMeta carries the creation-time metadata for a review job: the transport
+// request under review and the settings chosen for it. Only TRID is required;
+// the remaining fields are display-only (rendered in the review header) and may
+// be empty — e.g. TRTitle/TRAuthor are looked up client-side and absent when the
+// typed TR number is not in the browser's loaded list.
+type JobMeta struct {
+	TRID        string
+	TRTitle     string
+	TRAuthor    string
+	ModelLabel  string
+	PromptLabel string
 }
 
 type JobStore interface {
-	Create(ctx context.Context, trID string) (*Job, error)
+	Create(ctx context.Context, meta JobMeta) (*Job, error)
 	Get(ctx context.Context, id string) (*Job, error)
 	MarkRunning(ctx context.Context, id string) error
 	MarkDone(ctx context.Context, id string, reviewMarkdown string, usage TokenUsage) error

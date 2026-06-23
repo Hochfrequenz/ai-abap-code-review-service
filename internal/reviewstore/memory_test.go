@@ -11,7 +11,13 @@ import (
 
 func TestCreate_ReturnsJobWithPendingStatus(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
-	job, err := store.Create(context.Background(), "NPLK900014")
+	job, err := store.Create(context.Background(), reviewstore.JobMeta{
+		TRID:        "NPLK900014",
+		TRTitle:     "Fix invoice rounding",
+		TRAuthor:    "JDOE",
+		ModelLabel:  "Opus 4.8 (beste Qualität, >1€/Review)",
+		PromptLabel: "Pedantische Code-Review",
+	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -23,6 +29,35 @@ func TestCreate_ReturnsJobWithPendingStatus(t *testing.T) {
 	}
 	if job.Status != reviewstore.JobStatusPending {
 		t.Errorf("Status: got %q, want pending", job.Status)
+	}
+	// Metadata must round-trip through Create.
+	if job.TRTitle != "Fix invoice rounding" {
+		t.Errorf("TRTitle: got %q", job.TRTitle)
+	}
+	if job.TRAuthor != "JDOE" {
+		t.Errorf("TRAuthor: got %q", job.TRAuthor)
+	}
+	if job.ModelLabel != "Opus 4.8 (beste Qualität, >1€/Review)" {
+		t.Errorf("ModelLabel: got %q", job.ModelLabel)
+	}
+	if job.PromptLabel != "Pedantische Code-Review" {
+		t.Errorf("PromptLabel: got %q", job.PromptLabel)
+	}
+}
+
+// metadata round-trip must also survive Get (stored copy carries the fields).
+func TestCreateThenGet_PreservesMetadata(t *testing.T) {
+	store := reviewstore.NewMemoryStore()
+	job, _ := store.Create(context.Background(), reviewstore.JobMeta{
+		TRID: "TR100", TRTitle: "Title", TRAuthor: "AUTH",
+		ModelLabel: "ModelX", PromptLabel: "StyleY",
+	})
+	got, err := store.Get(context.Background(), job.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.TRTitle != "Title" || got.TRAuthor != "AUTH" || got.ModelLabel != "ModelX" || got.PromptLabel != "StyleY" {
+		t.Errorf("metadata not preserved on Get: %+v", got)
 	}
 }
 
@@ -36,7 +71,7 @@ func TestGet_UnknownID_ReturnsError(t *testing.T) {
 
 func TestMarkDone_StoresHTMLAndTimestamp(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
-	job, _ := store.Create(context.Background(), "TR001")
+	job, _ := store.Create(context.Background(), reviewstore.JobMeta{TRID: "TR001"})
 
 	err := store.MarkDone(context.Background(), job.ID, "# Review\n\nLooks good.", reviewstore.TokenUsage{})
 	if err != nil {
@@ -57,7 +92,7 @@ func TestMarkDone_StoresHTMLAndTimestamp(t *testing.T) {
 
 func TestMarkFailed_StoresErrMsg(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
-	job, _ := store.Create(context.Background(), "TR002")
+	job, _ := store.Create(context.Background(), reviewstore.JobMeta{TRID: "TR002"})
 
 	_ = store.MarkFailed(context.Background(), job.ID, "upstream timeout")
 
@@ -72,7 +107,7 @@ func TestMarkFailed_StoresErrMsg(t *testing.T) {
 
 func TestMarkRunning_UpdatesStatus(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
-	job, _ := store.Create(context.Background(), "TR003")
+	job, _ := store.Create(context.Background(), reviewstore.JobMeta{TRID: "TR003"})
 	_ = store.MarkRunning(context.Background(), job.ID)
 	got, _ := store.Get(context.Background(), job.ID)
 	if got.Status != reviewstore.JobStatusRunning {

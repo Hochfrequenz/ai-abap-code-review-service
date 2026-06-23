@@ -86,6 +86,63 @@ func TestRenderReview_ContainsTRIDAndContent(t *testing.T) {
 	}
 }
 
+func TestRenderReview_ContainsHeaderMeta(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	job := &reviewstore.Job{
+		ID:          "abc-123",
+		TRID:        "NPLK900014",
+		TRTitle:     "Fix invoice rounding",
+		TRAuthor:    "JDOE",
+		ModelLabel:  "Opus 4.8 (beste Qualität, >1€/Review)",
+		PromptLabel: "Pedantische Code-Review",
+		Status:      reviewstore.JobStatusDone,
+		ReviewHTML:  "<p>LGTM</p>",
+		CreatedAt:   time.Now(),
+	}
+	out, err := tmpl.RenderReview(job)
+	if err != nil {
+		t.Fatalf("RenderReview: %v", err)
+	}
+	for _, want := range []string{
+		"Transportauftrag NPLK900014",
+		"Fix invoice rounding",
+		"JDOE",
+		"Pedantische Code-Review",
+		// html/template escapes ">" to "&gt;" in the output.
+		"Opus 4.8 (beste Qualität, &gt;1€/Review)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("review header missing %q\n--- output ---\n%s", want, out)
+		}
+	}
+}
+
+// Empty TR metadata (TR number not in the browser's list) must not render
+// dangling separators or labels.
+func TestRenderReview_OmitsEmptyMeta(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	job := &reviewstore.Job{
+		ID:          "abc-123",
+		TRID:        "NPLK900014",
+		ModelLabel:  "Sonnet 4.6",
+		PromptLabel: "Wertschätzende Code-Review",
+		Status:      reviewstore.JobStatusDone,
+		ReviewHTML:  "<p>LGTM</p>",
+		CreatedAt:   time.Now(),
+	}
+	out, err := tmpl.RenderReview(job)
+	if err != nil {
+		t.Fatalf("RenderReview: %v", err)
+	}
+	if strings.Contains(out, "Ersteller:") {
+		t.Error("empty TRAuthor must not render an Ersteller label")
+	}
+	// Title must end right after the TRID when no TR title is present.
+	if !strings.Contains(out, "Transportauftrag NPLK900014</h1>") {
+		t.Errorf("title should be bare TRID when TRTitle empty\n%s", out)
+	}
+}
+
 func mustRenderStatus(t *testing.T, tmpl ui.Templates, job *reviewstore.Job) string {
 	t.Helper()
 	out, err := tmpl.RenderStatus(job)

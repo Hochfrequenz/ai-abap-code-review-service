@@ -3,6 +3,7 @@ package aireview
 import (
 	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -47,6 +48,13 @@ type reviewRequest struct {
 	Model string `json:"model" form:"model"`
 	// Prompt is the review style key from agent.AllowedPrompts().
 	Prompt string `json:"prompt" form:"prompt"`
+	// TRTitle and TRAuthor are display-only transport-request metadata, looked up
+	// client-side from the loaded TR list and submitted alongside the form. Both
+	// are optional (empty when the typed TR number is not in the browser's list)
+	// and are never used for logic — only rendered as escaped text in the review
+	// header. No binding constraints: untrusted, cosmetic.
+	TRTitle  string `json:"tr_title" form:"tr_title"`
+	TRAuthor string `json:"tr_author" form:"tr_author"`
 }
 
 const contentTypeHTML = "text/html; charset=utf-8"
@@ -86,7 +94,17 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 			return
 		}
 
-		job, err := store.Create(c.Request.Context(), req.TransportRequestID)
+		// Model/Prompt keys are validated above, so the lookups always hit.
+		// AllowedModels labels carry HTML entities for the <option> context
+		// (e.g. "&gt;1€"); decode to plain text here so html/template re-escapes
+		// them correctly when rendering the review header.
+		job, err := store.Create(c.Request.Context(), reviewstore.JobMeta{
+			TRID:        req.TransportRequestID,
+			TRTitle:     req.TRTitle,
+			TRAuthor:    req.TRAuthor,
+			ModelLabel:  html.UnescapeString(agent.AllowedModels()[req.Model]),
+			PromptLabel: agent.AllowedPrompts()[req.Prompt].Label,
+		})
 		if err != nil {
 			btp.AbortError(c, http.StatusInternalServerError, btp.CodeInternal, "failed to create review job", err)
 			return
