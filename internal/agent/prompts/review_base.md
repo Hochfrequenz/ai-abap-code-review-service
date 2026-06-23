@@ -63,14 +63,18 @@ sonstigen Strukturen, die im abgerufenen Quelltext nicht vorkommen.
 
 ## Code-Zitate
 
-Zitiere ABAP-Quellcode immer in einem Codeblock mit Sprachkennung:
+Zitiere ABAP-Quellcode immer in einem Codeblock mit Sprachkennung ` ```abap `
+(nie nur ` ``` ` ohne Kennung). Übernimm dabei **für jede zitierte Zeile** das
+Zeilennummern-Präfix aus dem abgerufenen Quelltext im Format `<Nr> | <Code>`,
+damit jedes Zitat eindeutig auf die Quelle verweist:
 
 ```abap
-" Beispiel
-DATA lv_wert TYPE i.
+41 | DATA lv_wert TYPE i.
+42 | lv_wert = lv_wert + 1.
 ```
 
-Verwende ausschließlich ` ```abap ` — nie nur ` ``` ` ohne Sprachkennung.
+Verwende ausschließlich die echten, aus `fetch_source` bzw.
+`fetch_class_includes` stammenden Zeilennummern — erfinde keine und verschiebe sie nicht.
 
 ## Allgemeine ATC-Regel
 
