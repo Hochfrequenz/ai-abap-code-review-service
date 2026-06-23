@@ -30,7 +30,7 @@ Ergänzend zur gemeinsamen Vorgehensweise:
 
 ## Ausgabeformat
 
-# Code-Review: <Transportauftragsnummer>
+(Kein Titel/keine H1 — die Titelzeile wird automatisch ergänzt. Beginne mit `## Transport-Überblick`.)
 
 ## Transport-Überblick
 Tabellarische Übersicht der Objekte (Name, Typ, Paket, hat Änderungen).

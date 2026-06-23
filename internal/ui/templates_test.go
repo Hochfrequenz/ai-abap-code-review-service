@@ -104,7 +104,7 @@ func TestRenderReview_ContainsHeaderMeta(t *testing.T) {
 		t.Fatalf("RenderReview: %v", err)
 	}
 	for _, want := range []string{
-		"Transportauftrag NPLK900014",
+		"Code-Review: NPLK900014",
 		"Fix invoice rounding",
 		"JDOE",
 		"Pedantische Code-Review",
@@ -138,7 +138,7 @@ func TestRenderReview_OmitsEmptyMeta(t *testing.T) {
 		t.Error("empty TRAuthor must not render an Ersteller label")
 	}
 	// Title must end right after the TRID when no TR title is present.
-	if !strings.Contains(out, "Transportauftrag NPLK900014</h1>") {
+	if !strings.Contains(out, "Code-Review: NPLK900014</h1>") {
 		t.Errorf("title should be bare TRID when TRTitle empty\n%s", out)
 	}
 }

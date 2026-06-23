@@ -148,7 +148,7 @@
   {{- if eq .Status "done" -}}
     <article class="review">
       <header class="review-meta">
-        <h1>Transportauftrag {{.TRID}}{{with .TRTitle}} — {{.}}{{end}}</h1>
+        <h1>Code-Review: {{.TRID}}{{with .TRTitle}} — {{.}}{{end}}</h1>
         <p class="review-meta__facts">
           {{- $sep := "" -}}
           {{- with .PromptLabel}}<strong>Stil:</strong> {{.}}{{- $sep = " · " -}}{{end}}

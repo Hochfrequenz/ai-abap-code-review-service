@@ -161,7 +161,9 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 			}
 			for _, block := range resp.Content {
 				if block.Type == "text" {
-					text := block.Text
+					// Drop any preamble/narration the model emitted before the
+					// first "## " section — the title is rendered by the UI layer.
+					text := stripModelPreamble(block.Text)
 					if resp.StopReason == "max_tokens" {
 						text += "\n\n---\n*Review truncated: output token limit reached.*"
 					}
