@@ -150,9 +150,10 @@
       <header class="review-meta">
         <h1>Transportauftrag {{.TRID}}{{with .TRTitle}} — {{.}}{{end}}</h1>
         <p class="review-meta__facts">
-          {{- with .PromptLabel}}<strong>Stil:</strong> {{.}}{{end}}
-          {{- with .ModelLabel}} · <strong>Modell:</strong> {{.}}{{end}}
-          {{- with .TRAuthor}} · <strong>Ersteller:</strong> {{.}}{{end}}
+          {{- $sep := "" -}}
+          {{- with .PromptLabel}}<strong>Stil:</strong> {{.}}{{- $sep = " · " -}}{{end}}
+          {{- with .ModelLabel}}{{- $sep -}}<strong>Modell:</strong> {{.}}{{- $sep = " · " -}}{{end}}
+          {{- with .TRAuthor}}{{- $sep -}}<strong>Ersteller:</strong> {{.}}{{end}}
         </p>
       </header>
       {{.ReviewHTML | safeHTML}}
