@@ -40,7 +40,7 @@ Beziehe dich bei jedem Befund explizit auf die verletzte Richtlinie.
 
 ## Ausgabeformat
 
-# Code-Review: <Transportauftragsnummer>
+(Kein Titel/keine H1 — die Titelzeile wird automatisch ergänzt. Beginne mit `## Zusammenfassung`.)
 
 ## Zusammenfassung
 2–3 Sätze: Werden die HF-Richtlinien eingehalten?

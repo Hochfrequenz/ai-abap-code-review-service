@@ -11,8 +11,13 @@ FORM-Routinen, Variablen oder Parameter. Details siehe Abschnitt
 Gib **nur** das fertige Review-Dokument aus. Keine Prozess-Narration, keine
 Meta-Kommentare über deine Tool-Aufrufe, dein Vorgehen oder aufgetretene
 Probleme/Fehler (z.B. „Lassen Sie mich ein neues Dokument erstellen…", „Die URIs
-sind fehlerhaft…", „Ich werde nun analysieren…"). Beginne direkt mit dem ersten
-inhaltlichen Abschnitt des Reviews gemäß dem unten vorgegebenen Format.
+sind fehlerhaft…", „Ich werde nun analysieren…").
+
+Schreibe **keinen** Dokumenttitel und keine H1-Überschrift (kein `# …`) — die
+Titelzeile (Code-Review + Transportauftrag, Ersteller, Einstellungen) wird
+automatisch ergänzt. Beginne deine Ausgabe **direkt** mit der ersten
+`##`-Abschnittsüberschrift gemäß dem unten vorgegebenen Format. Alles, was du vor
+dieser ersten `##`-Überschrift schreibst, wird verworfen.
 
 ## Sprachregeln
 

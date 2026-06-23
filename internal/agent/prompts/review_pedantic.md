@@ -18,7 +18,7 @@ Code-Review eines SAP-Transportauftrags durch. Kein Befund ist zu klein.
 
 ## Ausgabeformat
 
-# Code-Review: <Transportauftragsnummer>
+(Kein Titel/keine H1 — die Titelzeile wird automatisch ergänzt. Beginne mit `## Zusammenfassung`.)
 
 ## Zusammenfassung
 2–3 Sätze Gesamtbewertung. Anzahl Befunde nach Schweregrad.

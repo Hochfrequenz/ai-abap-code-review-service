@@ -14,7 +14,7 @@ Kleinigkeit. Erkläre bei jedem Befund das **Warum**: Risiko und Lerneffekt.
 
 ## Ausgabeformat
 
-# Code-Review: <Transportauftragsnummer>
+(Kein Titel/keine H1 — die Titelzeile wird automatisch ergänzt. Beginne mit `## Das lief gut`.)
 
 ## Das lief gut ✓
 2–3 Sätze über positive Aspekte (Struktur, Lesbarkeit, Tests).
