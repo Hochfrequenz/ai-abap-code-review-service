@@ -57,6 +57,17 @@
       color: var(--green-brand);
       margin-bottom: 1rem;
     }
+    .review-meta {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--gray);
+    }
+    .review-meta h1 { margin-bottom: 0.35rem; }
+    .review-meta__facts {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    .review-meta__facts strong { color: var(--soft-black); }
     article.review h2 {
       font-family: 'Yanone Kaffeesatz', sans-serif;
       font-size: 1.5rem;
@@ -135,7 +146,18 @@
   <nav><a href="/">← Neue Review</a></nav>
   <div id="status">
   {{- if eq .Status "done" -}}
-    <article class="review">{{.ReviewHTML | safeHTML}}</article>
+    <article class="review">
+      <header class="review-meta">
+        <h1>Transportauftrag {{.TRID}}{{with .TRTitle}} — {{.}}{{end}}</h1>
+        <p class="review-meta__facts">
+          {{- $sep := "" -}}
+          {{- with .PromptLabel}}<strong>Stil:</strong> {{.}}{{- $sep = " · " -}}{{end}}
+          {{- with .ModelLabel}}{{- $sep -}}<strong>Modell:</strong> {{.}}{{- $sep = " · " -}}{{end}}
+          {{- with .TRAuthor}}{{- $sep -}}<strong>Ersteller:</strong> {{.}}{{end}}
+        </p>
+      </header>
+      {{.ReviewHTML | safeHTML}}
+    </article>
     <div class="token-usage">
       <span>Token: {{.Usage.InputTokens}} ein / {{.Usage.OutputTokens}} aus{{if .Usage.CacheReadTokens}} / {{.Usage.CacheReadTokens}} Cache-Treffer{{end}}</span>
       {{- if .Usage.EstimatedCostUSD}}<span> · ca. ${{printf "%.4f" .Usage.EstimatedCostUSD}} (Schätzung)</span>{{end}}
