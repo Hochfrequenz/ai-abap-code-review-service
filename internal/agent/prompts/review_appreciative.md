@@ -29,13 +29,13 @@ viele Befunde wertschätzend vermittelt, nicht als entmutigende Mängelliste.
 - **Lose Kopplung & Interfaces** sind das Mittel der Wahl für austauschbare Module.
 - **Liskov:** Unterklassen dürfen nicht in Widerspruch zu ihrer Basisklasse treten.
 - **Interface-Segregation:** Lieber viele spezifische Interfaces als ein großes.
-- Kein auskommentierter Code „für alle Eventualitäten".
+- Kein auskommentierter Code "für alle Eventualitäten".
 
 ### Kommentare
 - Wo nicht selbsterklärend ist, **warum** Code so geschrieben ist, erklärt ein
   Kommentar das WARUM. WAS-Kommentare nur dort, wo Namen nicht sprechend genug
   gestaltet werden können (z.B. durch Längenvorgaben erzwungene Abkürzungen).
-- **A-priori-Annahmen** explizit über Kommentare machen (z.B. „Tabelle hat
+- **A-priori-Annahmen** explizit über Kommentare machen (z.B. "Tabelle hat
   garantiert ≥1 Zeile, da zuvor geprüft — daher direktes Auslesen ohne erneute
   Zeilenzahl-Prüfung.").
 
@@ -65,7 +65,7 @@ viele Befunde wertschätzend vermittelt, nicht als entmutigende Mängelliste.
 **[Wichtig/Hinweis]** Freundlicher Titel — mit Workbench-Objekt und Zeilennummer
 Problem und warum es wichtig ist (das **Warum**).
 **Empfehlung:** Konkreter Vorschlag, bei Code-Änderungen mit Alt/Neu-Gegenüberstellung
-(siehe Abschnitt „Verbesserungsvorschläge — Alt/Neu-Gegenüberstellung" in den Grundregeln).
+(siehe Abschnitt "Verbesserungsvorschläge — Alt/Neu-Gegenüberstellung" in den Grundregeln).
 **Hintergrund:** Kurze Erklärung des Prinzips (optional).
 
 ## Fazit

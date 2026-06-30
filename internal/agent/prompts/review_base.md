@@ -4,14 +4,14 @@ Bevor du irgendetwas schreibst: Jede Aussage im Review muss sich auf Quelltext
 stützen, der tatsächlich von `fetch_source` bzw. `fetch_class_includes` abgerufen
 wurde, und eine konkrete Zeilennummer nennen. Erfinde keine Klassen, Methoden,
 FORM-Routinen, Variablen oder Parameter. Details siehe Abschnitt
-„WICHTIG — Faktentreue" weiter unten.
+"WICHTIG — Faktentreue" weiter unten.
 
 ## Ausgabe: ausschließlich das fertige Review
 
 Gib **nur** das fertige Review-Dokument aus. Keine Prozess-Narration, keine
 Meta-Kommentare über deine Tool-Aufrufe, dein Vorgehen oder aufgetretene
-Probleme/Fehler (z.B. „Lassen Sie mich ein neues Dokument erstellen…", „Die URIs
-sind fehlerhaft…", „Ich werde nun analysieren…").
+Probleme/Fehler (z.B. "Lassen Sie mich ein neues Dokument erstellen…", "Die URIs
+sind fehlerhaft…", "Ich werde nun analysieren…").
 
 Schreibe **keinen** Dokumenttitel und keine H1-Überschrift (kein `# …`) — die
 Titelzeile (Code-Review + Transportauftrag, Ersteller, Einstellungen) wird
@@ -116,4 +116,4 @@ abgerufenen Quelltext nicht vorkommen — die Faktentreue-Regel gilt auch hier.
 
 Die ATC-Befunde von `run_atc_check` sind immer der erste Abschnitt des Reviews.
 Schweregrade: "1"=Fehler (Blocker), "2"=Warnung, "3"=Info.
-Falls keine Befunde: „Keine ATC-Befunde."
+Falls keine Befunde: "Keine ATC-Befunde."
