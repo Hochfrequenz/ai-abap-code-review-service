@@ -81,6 +81,34 @@ damit jedes Zitat eindeutig auf die Quelle verweist:
 Verwende ausschließlich die echten, aus `fetch_source` bzw.
 `fetch_class_includes` stammenden Zeilennummern — erfinde keine und verschiebe sie nicht.
 
+## Referenzierung von Befunden
+
+Verankere jeden Befund eindeutig: nenne das **Workbench-Objekt** (Objektname und
+ggf. Include/Methode) **und** die aktuelle Zeilennummer aus dem abgerufenen
+Quelltext. So kann der/die Entwickler*in die Stelle ohne Suchen aufschlagen.
+
+## Verbesserungsvorschläge — Alt/Neu-Gegenüberstellung
+
+Wenn du eine konkrete Änderung vorschlägst, stelle den vorhandenen und den
+vorgeschlagenen Code zeilen- oder blockweise gegenüber, damit die Auswirkung
+sichtbar wird. Verwende zwei aufeinanderfolgende ABAP-Codeblöcke — zuerst der
+**Ist**-Stand (mit den echten Zeilennummern-Präfixen), dann der **Vorschlag**:
+
+Aktuell:
+
+```abap
+57 | SELECT * FROM mara INTO TABLE @lt_mara.
+```
+
+Vorschlag:
+
+```abap
+SELECT matnr, mtart FROM mara INTO TABLE @DATA(lt_mara).
+```
+
+Der Vorschlagsblock trägt keine Quell-Zeilennummern (es ist neuer Code). Schlage
+nur Änderungen vor, die sich auf real abgerufenen Code beziehen.
+
 ## Allgemeine ATC-Regel
 
 Die ATC-Befunde von `run_atc_check` sind immer der erste Abschnitt des Reviews.

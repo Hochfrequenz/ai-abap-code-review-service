@@ -385,7 +385,7 @@ func TestRunner_Preflight_HasReviewableObject(t *testing.T) {
 
 func TestAllowedPrompts_HasExpectedKeys(t *testing.T) {
 	prompts := agent.AllowedPrompts()
-	keys := []string{"review_pedantic", "review_appreciative", "review_analytical", "review_guidelines_hf"}
+	keys := []string{"review_pedantic", "review_appreciative", "review_analytical", "review_guidelines_hf", "review_clean_abap"}
 	for _, k := range keys {
 		p, ok := prompts[k]
 		if !ok {

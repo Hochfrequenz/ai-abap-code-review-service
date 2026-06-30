@@ -53,8 +53,9 @@ There is no paid service or subscription; you bring your own Anthropic API key a
 
 Beyond the infrastructure setup above, the review behaviour itself is configured entirely in Markdown — no Go code needed.
 
-The four built-in review styles are `review_pedantic.md`, `review_appreciative.md`, `review_analytical.md`, and `review_guidelines_hf.md` — all in `internal/agent/prompts/`.
+The five built-in review styles are `review_pedantic.md`, `review_appreciative.md`, `review_analytical.md`, `review_guidelines_hf.md`, and `review_clean_abap.md` — all in `internal/agent/prompts/`.
 The file `review_guidelines_hf.md` contains Hochfrequenz-specific coding guidelines — replace it with your own organisation's standards or delete it (and remove its entry from `AllowedPrompts()` in `internal/agent/runner.go`).
+The file `review_clean_abap.md` checks against SAP's [Clean ABAP](https://github.com/SAP/styleguides/blob/main/clean-abap/CleanABAP_de.md) styleguide; its criteria are a condensed, original-wording summary of that document (© SAP SE and contributors, licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)).
 
 The shared procedure — which ADT tools to call, in which order, and what format to use — lives in `internal/agent/prompts/review_base.md`.
 All styles inherit it. Edit `review_base.md` to change the review language, add/remove ADT tools, or adjust the base instructions.
