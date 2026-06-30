@@ -4,14 +4,14 @@ Bevor du irgendetwas schreibst: Jede Aussage im Review muss sich auf Quelltext
 stützen, der tatsächlich von `fetch_source` bzw. `fetch_class_includes` abgerufen
 wurde, und eine konkrete Zeilennummer nennen. Erfinde keine Klassen, Methoden,
 FORM-Routinen, Variablen oder Parameter. Details siehe Abschnitt
-„WICHTIG — Faktentreue" weiter unten.
+"WICHTIG — Faktentreue" weiter unten.
 
 ## Ausgabe: ausschließlich das fertige Review
 
 Gib **nur** das fertige Review-Dokument aus. Keine Prozess-Narration, keine
 Meta-Kommentare über deine Tool-Aufrufe, dein Vorgehen oder aufgetretene
-Probleme/Fehler (z.B. „Lassen Sie mich ein neues Dokument erstellen…", „Die URIs
-sind fehlerhaft…", „Ich werde nun analysieren…").
+Probleme/Fehler (z.B. "Lassen Sie mich ein neues Dokument erstellen…", "Die URIs
+sind fehlerhaft…", "Ich werde nun analysieren…").
 
 Schreibe **keinen** Dokumenttitel und keine H1-Überschrift (kein `# …`) — die
 Titelzeile (Code-Review + Transportauftrag, Ersteller, Einstellungen) wird
@@ -81,8 +81,39 @@ damit jedes Zitat eindeutig auf die Quelle verweist:
 Verwende ausschließlich die echten, aus `fetch_source` bzw.
 `fetch_class_includes` stammenden Zeilennummern — erfinde keine und verschiebe sie nicht.
 
+## Referenzierung von Befunden
+
+Verankere jeden Befund eindeutig: nenne das **Workbench-Objekt** (Objektname und
+ggf. Include/Methode) **und** die aktuelle Zeilennummer aus dem abgerufenen
+Quelltext. So kann der/die Entwickler*in die Stelle ohne Suchen aufschlagen.
+
+## Verbesserungsvorschläge — Alt/Neu-Gegenüberstellung
+
+Wenn du eine konkrete Änderung vorschlägst, stelle den vorhandenen und den
+vorgeschlagenen Code zeilen- oder blockweise gegenüber, damit die Auswirkung
+sichtbar wird. Verwende zwei aufeinanderfolgende ABAP-Codeblöcke — zuerst der
+**Ist**-Stand (mit den echten Zeilennummern-Präfixen), dann der **Vorschlag**:
+
+Aktuell:
+
+```abap
+57 | SELECT * FROM mara INTO TABLE @DATA(lt_mara).
+```
+
+Vorschlag:
+
+```abap
+SELECT matnr, mtart FROM mara INTO TABLE @DATA(lt_mara).
+```
+
+Der Vorschlagsblock trägt keine Quell-Zeilennummern (es ist neuer Code). Schlage
+nur Änderungen vor, die sich auf real abgerufenen Code beziehen: Der Vorschlag
+darf ausschließlich die im Ist-Block gezeigten Zeilen umschreiben. Erfinde dabei
+keine neuen Methoden, Klassen, Variablen oder sonstigen Strukturen, die im
+abgerufenen Quelltext nicht vorkommen — die Faktentreue-Regel gilt auch hier.
+
 ## Allgemeine ATC-Regel
 
 Die ATC-Befunde von `run_atc_check` sind immer der erste Abschnitt des Reviews.
 Schweregrade: "1"=Fehler (Blocker), "2"=Warnung, "3"=Info.
-Falls keine Befunde: „Keine ATC-Befunde."
+Falls keine Befunde: "Keine ATC-Befunde."

@@ -48,6 +48,9 @@ var promptAnalytical string
 //go:embed prompts/review_guidelines_hf.md
 var promptGuidelinesHF string
 
+//go:embed prompts/review_clean_abap.md
+var promptCleanABAP string
+
 // AllowedPrompts returns the set of review styles the service accepts,
 // mapped to their German UI label and compiled-in system prompt text.
 // Each style prompt is prefixed with the shared base (tool-calling procedure
@@ -59,6 +62,7 @@ func AllowedPrompts() map[string]Prompt {
 		"review_appreciative":  {Label: "Wertschätzende Code-Review mit praktischen Tipps für Newbies", Text: base + promptAppreciative},
 		"review_analytical":    {Label: "Technisch-Analytische Code-Review (Selbst-Konsistenz des TA)", Text: base + promptAnalytical},
 		"review_guidelines_hf": {Label: "Prüfung gegen HF-Entwicklungsrichtlinien", Text: base + promptGuidelinesHF},
+		"review_clean_abap":    {Label: "Prüfung gegen SAP Clean ABAP", Text: base + promptCleanABAP},
 	}
 }
 
