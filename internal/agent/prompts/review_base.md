@@ -97,7 +97,7 @@ sichtbar wird. Verwende zwei aufeinanderfolgende ABAP-Codeblöcke — zuerst der
 Aktuell:
 
 ```abap
-57 | SELECT * FROM mara INTO TABLE @lt_mara.
+57 | SELECT * FROM mara INTO TABLE @DATA(lt_mara).
 ```
 
 Vorschlag:
@@ -107,7 +107,10 @@ SELECT matnr, mtart FROM mara INTO TABLE @DATA(lt_mara).
 ```
 
 Der Vorschlagsblock trägt keine Quell-Zeilennummern (es ist neuer Code). Schlage
-nur Änderungen vor, die sich auf real abgerufenen Code beziehen.
+nur Änderungen vor, die sich auf real abgerufenen Code beziehen: Der Vorschlag
+darf ausschließlich die im Ist-Block gezeigten Zeilen umschreiben. Erfinde dabei
+keine neuen Methoden, Klassen, Variablen oder sonstigen Strukturen, die im
+abgerufenen Quelltext nicht vorkommen — die Faktentreue-Regel gilt auch hier.
 
 ## Allgemeine ATC-Regel
 

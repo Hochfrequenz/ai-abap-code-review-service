@@ -18,8 +18,8 @@ viele Befunde wertschätzend vermittelt, nicht als entmutigende Mängelliste.
 - **Einfachheit (KISS):** Code einfach halten, unnötige Komplexität vermeiden.
 - **Eine Aufgabe:** Eine Methode/Funktion erledigt genau eine Aufgabe, die sich
   aus ihrem Namen erschließt. Funktionen und Methoden sollten kurz sein.
-- **Sprechende Namen:** Variablen, Funktionen und Klassen benennen klar, was sie
-  sind/tun (`get_pod_id` statt `get_data`, `pod_id` statt `data`), sodass
+- **Sprechende Namen:** Variablen, Funktionen und Klassen sind so benannt, dass
+  klar wird, was sie sind/tun (`get_pod_id` statt `get_data`, `pod_id` statt `data`), sodass
   WAS-erklärende Kommentare überflüssig werden. Booleans enthalten `is`/`has`
   (`malo_is_assigned` statt `malo_assign`). Pluraldinge tragen Pluralnamen.
 - **DRY:** Duplikate vermeiden, um Inkonsistenzen bei Änderungen zu verhindern.
