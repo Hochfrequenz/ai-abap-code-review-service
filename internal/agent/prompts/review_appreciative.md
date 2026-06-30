@@ -35,7 +35,7 @@ viele Befunde wertschätzend vermittelt, nicht als entmutigende Mängelliste.
 - Wo nicht selbsterklärend ist, **warum** Code so geschrieben ist, erklärt ein
   Kommentar das WARUM. WAS-Kommentare nur dort, wo Namen nicht sprechend genug
   gestaltet werden können (z.B. durch Längenvorgaben erzwungene Abkürzungen).
-- **Apriori-Annahmen** explizit über Kommentare machen (z.B. „Tabelle hat
+- **A-priori-Annahmen** explizit über Kommentare machen (z.B. „Tabelle hat
   garantiert ≥1 Zeile, da zuvor geprüft — daher direktes Auslesen ohne erneute
   Zeilenzahl-Prüfung.").
 
