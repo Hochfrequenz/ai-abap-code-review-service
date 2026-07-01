@@ -117,13 +117,12 @@ var modelCostPerMillion = map[string][4]float64{
 // and source code, then returns the final markdown review text and token usage.
 // model must be a non-empty key from AllowedModels(); promptKey must be a non-empty
 // key from AllowedPrompts(). Callers are responsible for validation — Run does not
-// default or substitute silently.
-func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string, reviewstore.TokenUsage, error) {
+// default or substitute silently. userComment is optional free text the submitter
+// typed (e.g. acceptance criteria); pass "" when absent.
+func (r *Runner) Run(ctx context.Context, trID, model, promptKey, userComment string) (string, reviewstore.TokenUsage, error) {
 	promptText := AllowedPrompts()[promptKey].Text
 	messages := []anthropic.MessageParam{
-		anthropic.NewUserMessage(anthropic.NewTextBlock(
-			fmt.Sprintf("Please review transport request: %s", trID),
-		)),
+		anthropic.NewUserMessage(anthropic.NewTextBlock(buildReviewRequest(trID, userComment))),
 	}
 
 	toolDefs := r.buildToolDefs()
@@ -202,6 +201,21 @@ func (r *Runner) Run(ctx context.Context, trID, model, promptKey string) (string
 		messages = append(messages, anthropic.NewUserMessage(toolResults...))
 	}
 	return "", usage, fmt.Errorf("review did not complete within %d tool-use iterations", reviewMaxToolLoops)
+}
+
+// buildReviewRequest composes the initial user turn. userComment — if present —
+// is appended here, inside a <user_comment> block, and NEVER into the system
+// prompt: the system prompt is trusted instruction text, while this block is
+// free text a developer typed into a form. Keeping it confined to a user
+// message (with review_base.md instructing the model to treat the block as
+// context, not instructions) is what stops it from being able to redefine the
+// review's rules, format or language.
+func buildReviewRequest(trID, userComment string) string {
+	msg := fmt.Sprintf("Please review transport request: %s", trID)
+	if userComment == "" {
+		return msg
+	}
+	return msg + fmt.Sprintf("\n\n<user_comment>\n%s\n</user_comment>", userComment)
 }
 
 // dispatch routes a tool call by name to the appropriate handler.

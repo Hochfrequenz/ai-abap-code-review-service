@@ -45,6 +45,7 @@ func (f *fakeStore) Create(_ context.Context, meta reviewstore.JobMeta) (*review
 	f.job.TRAuthor = meta.TRAuthor
 	f.job.ModelLabel = meta.ModelLabel
 	f.job.PromptLabel = meta.PromptLabel
+	f.job.UserComment = meta.UserComment
 	return f.job, nil
 }
 func (f *fakeStore) Get(_ context.Context, _ string) (*reviewstore.Job, error) {
@@ -69,7 +70,19 @@ type fakeRunner struct {
 }
 
 func (f *fakeRunner) Preflight(_ context.Context, _ string) error { return f.preflightErr }
-func (f *fakeRunner) Run(_ context.Context, _, _, _ string) (string, reviewstore.TokenUsage, error) {
+func (f *fakeRunner) Run(_ context.Context, _, _, _, _ string) (string, reviewstore.TokenUsage, error) {
+	return "# Review\n\nAll good.", reviewstore.TokenUsage{}, nil
+}
+
+// capturingRunner records the arguments it was called with, so tests can
+// assert what the handler passed down without inspecting HTTP responses.
+type capturingRunner struct {
+	capturedComment chan string
+}
+
+func (f *capturingRunner) Preflight(_ context.Context, _ string) error { return nil }
+func (f *capturingRunner) Run(_ context.Context, _, _, _, userComment string) (string, reviewstore.TokenUsage, error) {
+	f.capturedComment <- userComment
 	return "# Review\n\nAll good.", reviewstore.TokenUsage{}, nil
 }
 
@@ -495,5 +508,101 @@ func TestPost_EmptyPrompt_Returns400(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("empty prompt must return 400, got %d — body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPost_UserComment_StoredInJobMeta(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000021")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouter(store, &fakeRunner{}, tmpl)
+
+	body, _ := json.Marshal(map[string]string{
+		"transport_request_id": "NPLK900014",
+		"model":                "claude-opus-4-8",
+		"prompt":               "review_pedantic",
+		"user_comment":         "Bitte auf 2 Nachkommastellen runden.",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	if store.job.UserComment != "Bitte auf 2 Nachkommastellen runden." {
+		t.Errorf("UserComment: got %q", store.job.UserComment)
+	}
+}
+
+func TestPost_UserComment_WhitespaceOnly_TrimmedToEmpty(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000022")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouter(store, &fakeRunner{}, tmpl)
+
+	body, _ := json.Marshal(map[string]string{
+		"transport_request_id": "NPLK900014",
+		"model":                "claude-opus-4-8",
+		"prompt":               "review_pedantic",
+		"user_comment":         "   \n\t  ",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	if store.job.UserComment != "" {
+		t.Errorf("whitespace-only comment must be trimmed to empty, got %q", store.job.UserComment)
+	}
+}
+
+func TestPost_UserComment_PassedToRunner(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000023")
+	tmpl := ui.MustLoadTemplates()
+	runner := &capturingRunner{capturedComment: make(chan string, 1)}
+	r := newRouter(store, runner, tmpl)
+
+	body, _ := json.Marshal(map[string]string{
+		"transport_request_id": "NPLK900014",
+		"model":                "claude-opus-4-8",
+		"prompt":               "review_pedantic",
+		"user_comment":         "Akzeptanzkriterium XYZ",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	select {
+	case got := <-runner.capturedComment:
+		if got != "Akzeptanzkriterium XYZ" {
+			t.Errorf("runner.Run received comment %q, want %q", got, "Akzeptanzkriterium XYZ")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for runner.Run to be called")
+	}
+}
+
+func TestPost_UserCommentTooLong_Returns400(t *testing.T) {
+	store := newFakeStore("00000000-0000-0000-0000-000000000024")
+	tmpl := ui.MustLoadTemplates()
+	r := newRouter(store, &fakeRunner{}, tmpl)
+
+	body, _ := json.Marshal(map[string]string{
+		"transport_request_id": "NPLK900014",
+		"model":                "claude-opus-4-8",
+		"prompt":               "review_pedantic",
+		"user_comment":         strings.Repeat("a", 2001),
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/reviews", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("comment over 2000 chars must return 400, got %d — body: %s", w.Code, w.Body.String())
 	}
 }

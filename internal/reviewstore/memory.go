@@ -30,6 +30,7 @@ func (s *memoryStore) Create(_ context.Context, meta JobMeta) (*Job, error) {
 		TRAuthor:    meta.TRAuthor,
 		ModelLabel:  meta.ModelLabel,
 		PromptLabel: meta.PromptLabel,
+		UserComment: meta.UserComment,
 		Status:      JobStatusPending,
 		CreatedAt:   time.Now(),
 	}

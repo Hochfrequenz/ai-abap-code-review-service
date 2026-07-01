@@ -25,9 +25,10 @@ type TokenUsage struct {
 	EstimatedCostUSD    float64
 }
 
-// Job is one review job and its result. TRTitle, TRAuthor, ModelLabel and
-// PromptLabel are display-only metadata captured at creation time (see JobMeta)
-// and rendered in the review header; ModelLabel is plain text (not HTML-encoded).
+// Job is one review job and its result. TRTitle, TRAuthor, ModelLabel,
+// PromptLabel and UserComment are display-only metadata captured at creation
+// time (see JobMeta) and rendered in the review header; ModelLabel is plain
+// text (not HTML-encoded).
 type Job struct {
 	ID          string
 	TRID        string
@@ -35,6 +36,7 @@ type Job struct {
 	TRAuthor    string
 	ModelLabel  string
 	PromptLabel string
+	UserComment string
 	Status      JobStatus
 	ReviewHTML  string
 	ErrMsg      string
@@ -47,13 +49,16 @@ type Job struct {
 // request under review and the settings chosen for it. Only TRID is required;
 // the remaining fields are display-only (rendered in the review header) and may
 // be empty — e.g. TRTitle/TRAuthor are looked up client-side and absent when the
-// typed TR number is not in the browser's loaded list.
+// typed TR number is not in the browser's loaded list. UserComment is free text
+// the submitter typed (e.g. acceptance criteria); it is also fed to the LLM as
+// review context — see agent.Runner.Run.
 type JobMeta struct {
 	TRID        string
 	TRTitle     string
 	TRAuthor    string
 	ModelLabel  string
 	PromptLabel string
+	UserComment string
 }
 
 type JobStore interface {
