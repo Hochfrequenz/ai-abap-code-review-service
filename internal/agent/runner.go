@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 
@@ -227,7 +228,18 @@ func buildReviewRequest(trID, userComment string) string {
 	if userComment == "" {
 		return msg
 	}
-	return msg + fmt.Sprintf("\n\n<user_comment>\n%s\n</user_comment>", userComment)
+	return msg + fmt.Sprintf("\n\n<user_comment>\n%s\n</user_comment>", escapeAngleBrackets(userComment))
+}
+
+// escapeAngleBrackets neutralises "<" and ">" so a submitted comment cannot
+// forge a "</user_comment>" (or any other tag-like sequence) and break out of
+// the wrapper in buildReviewRequest. Without this, trailing text after a
+// forged closing tag would read as if it sat outside the block, defeating
+// review_user_comment.md's instruction to treat everything inside it as
+// untrusted context rather than instructions. This only affects the text sent
+// to Claude — the stored/displayed comment (job.UserComment) is untouched.
+func escapeAngleBrackets(s string) string {
+	return strings.NewReplacer("<", "&lt;", ">", "&gt;").Replace(s)
 }
 
 // dispatch routes a tool call by name to the appropriate handler.
