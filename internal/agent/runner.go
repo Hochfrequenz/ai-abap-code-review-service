@@ -51,6 +51,9 @@ var promptGuidelinesHF string
 //go:embed prompts/review_clean_abap.md
 var promptCleanABAP string
 
+//go:embed prompts/review_user_comment.md
+var promptUserComment string
+
 // AllowedPrompts returns the set of review styles the service accepts,
 // mapped to their German UI label and compiled-in system prompt text.
 // Each style prompt is prefixed with the shared base (tool-calling procedure
@@ -121,6 +124,15 @@ var modelCostPerMillion = map[string][4]float64{
 // typed (e.g. acceptance criteria); pass "" when absent.
 func (r *Runner) Run(ctx context.Context, trID, model, promptKey, userComment string) (string, reviewstore.TokenUsage, error) {
 	promptText := AllowedPrompts()[promptKey].Text
+	// The Nutzer-Kommentar instructions are only relevant when a comment was
+	// actually submitted — appending them unconditionally would spend tokens
+	// and prompt complexity on every review, including the (currently most
+	// common) case where nobody used the field. This does mean requests with
+	// vs. without a comment are two distinct cacheable prefixes rather than
+	// one, which is an acceptable trade for not bloating the common path.
+	if userComment != "" {
+		promptText += "\n\n---\n\n" + promptUserComment
+	}
 	messages := []anthropic.MessageParam{
 		anthropic.NewUserMessage(anthropic.NewTextBlock(buildReviewRequest(trID, userComment))),
 	}

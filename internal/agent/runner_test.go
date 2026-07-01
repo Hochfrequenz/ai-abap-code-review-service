@@ -512,6 +512,9 @@ func TestRunner_UserComment_InMessageNotSystemPrompt(t *testing.T) {
 	if strings.Contains(capturedSystemPrompt, comment) {
 		t.Error("user comment must NEVER appear in the system prompt — it must only carry message-level authority")
 	}
+	if !strings.Contains(capturedSystemPrompt, "<user_comment>") {
+		t.Error("system prompt must explain how to handle the <user_comment> block when one is actually sent")
+	}
 }
 
 // TestRunner_EmptyUserComment_MessageUnchanged locks in that the common case
@@ -545,5 +548,49 @@ func TestRunner_EmptyUserComment_MessageUnchanged(t *testing.T) {
 	want := "Please review transport request: NPLK900014"
 	if capturedUserMessage != want {
 		t.Errorf("message: got %q, want %q", capturedUserMessage, want)
+	}
+}
+
+// TestRunner_EmptyUserComment_SystemPromptUnchanged locks in that reviews
+// without a comment (today's common case) pay zero extra tokens/complexity
+// for the comment-handling instructions — the system prompt sent to Claude
+// must be byte-identical to the plain style prompt.
+func TestRunner_EmptyUserComment_SystemPromptUnchanged(t *testing.T) {
+	var capturedSystemPrompt string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if sys, ok := body["system"].([]any); ok && len(sys) > 0 {
+			if block, ok := sys[0].(map[string]any); ok {
+				if text, ok := block["text"].(string); ok {
+					capturedSystemPrompt = text
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": "claude-opus-4-8", "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	want := agent.AllowedPrompts()["review_pedantic"].Text
+	if capturedSystemPrompt != want {
+		t.Errorf("system prompt must be unchanged when no comment is given\ngot:  %q\nwant: %q", capturedSystemPrompt[:min(80, len(capturedSystemPrompt))], want[:min(80, len(want))])
+	}
+	if strings.Contains(capturedSystemPrompt, "user_comment") {
+		t.Error("system prompt must not mention user_comment handling at all when no comment is given")
 	}
 }
