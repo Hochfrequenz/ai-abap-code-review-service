@@ -17,6 +17,7 @@ func TestCreate_ReturnsJobWithPendingStatus(t *testing.T) {
 		TRAuthor:    "JDOE",
 		ModelLabel:  "Opus 4.8 (beste Qualität, >1€/Review)",
 		PromptLabel: "Pedantische Code-Review",
+		UserComment: "Bitte auf 2 Nachkommastellen runden.",
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -43,6 +44,9 @@ func TestCreate_ReturnsJobWithPendingStatus(t *testing.T) {
 	if job.PromptLabel != "Pedantische Code-Review" {
 		t.Errorf("PromptLabel: got %q", job.PromptLabel)
 	}
+	if job.UserComment != "Bitte auf 2 Nachkommastellen runden." {
+		t.Errorf("UserComment: got %q", job.UserComment)
+	}
 }
 
 // metadata round-trip must also survive Get (stored copy carries the fields).
@@ -50,13 +54,13 @@ func TestCreateThenGet_PreservesMetadata(t *testing.T) {
 	store := reviewstore.NewMemoryStore()
 	job, _ := store.Create(context.Background(), reviewstore.JobMeta{
 		TRID: "TR100", TRTitle: "Title", TRAuthor: "AUTH",
-		ModelLabel: "ModelX", PromptLabel: "StyleY",
+		ModelLabel: "ModelX", PromptLabel: "StyleY", UserComment: "CommentZ",
 	})
 	got, err := store.Get(context.Background(), job.ID)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if got.TRTitle != "Title" || got.TRAuthor != "AUTH" || got.ModelLabel != "ModelX" || got.PromptLabel != "StyleY" {
+	if got.TRTitle != "Title" || got.TRAuthor != "AUTH" || got.ModelLabel != "ModelX" || got.PromptLabel != "StyleY" || got.UserComment != "CommentZ" {
 		t.Errorf("metadata not preserved on Get: %+v", got)
 	}
 }

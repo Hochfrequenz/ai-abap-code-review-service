@@ -51,7 +51,7 @@ func TestRunner_UsesSpecifiedModel(t *testing.T) {
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
 	runner := agent.NewRunner(tools, claudeClient)
 
-	_, _, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6), "review_pedantic")
+	_, _, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeSonnet4_6), "review_pedantic", "")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestRunner_ToolLoopAndFinalText(t *testing.T) {
 	)
 
 	runner := agent.NewRunner(tools, claudeClient)
-	result, usage, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	result, usage, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestRunner_DispatchTools(t *testing.T) {
 			tools := agent.NewTools(fake)
 			claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 			runner := agent.NewRunner(tools, claudeClient)
-			result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+			result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
@@ -234,7 +234,7 @@ func TestRunner_MaxTokens_ReturnsTruncatedReview(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
 	if err != nil {
 		t.Fatalf("expected partial result not error, got: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestRunner_ConcatenatesTextBlocksBeforePreambleStripping(t *testing.T) {
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
 
-	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	result, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
 	if err != nil {
 		t.Fatalf("expected result not error, got: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestRunner_UnexpectedStopReason_ReturnsError(t *testing.T) {
 	tools := agent.NewTools(fake)
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test"))
 	runner := agent.NewRunner(tools, claudeClient)
-	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic")
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
 	if err == nil {
 		t.Error("expected error for unexpected stop reason")
 	}
@@ -428,7 +428,7 @@ func TestRunner_UsesSpecifiedPrompt(t *testing.T) {
 	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
 	runner := agent.NewRunner(tools, claudeClient)
 
-	_, _, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeOpus4_8), "review_analytical")
+	_, _, err := runner.Run(context.Background(), "NPLK900014", string(anthropic.ModelClaudeOpus4_8), "review_analytical", "")
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -436,5 +436,197 @@ func TestRunner_UsesSpecifiedPrompt(t *testing.T) {
 	if capturedSystemPrompt != want {
 		// min() is a builtin in Go 1.21+ (this module uses go 1.26)
 		t.Errorf("wrong system prompt sent to Claude API\ngot:  %q\nwant: %q", capturedSystemPrompt[:min(80, len(capturedSystemPrompt))], want[:min(80, len(want))])
+	}
+}
+
+// firstUserMessageText extracts the text of the first content block of the
+// first message in a decoded Claude API request body — messages[0].content[0].text.
+func firstUserMessageText(t *testing.T, body map[string]any) string {
+	t.Helper()
+	messages, ok := body["messages"].([]any)
+	if !ok || len(messages) == 0 {
+		t.Fatalf("no messages in request body: %v", body)
+	}
+	msg, ok := messages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("messages[0] is not an object: %v", messages[0])
+	}
+	content, ok := msg["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatalf("messages[0].content is not a non-empty array: %v", msg["content"])
+	}
+	block, ok := content[0].(map[string]any)
+	if !ok {
+		t.Fatalf("messages[0].content[0] is not an object: %v", content[0])
+	}
+	text, ok := block["text"].(string)
+	if !ok {
+		t.Fatalf("messages[0].content[0].text is not a string: %v", block["text"])
+	}
+	return text
+}
+
+// TestRunner_UserComment_InMessageNotSystemPrompt guards the architectural
+// requirement from issue #61: a user-supplied comment must reach Claude only
+// through the message turn, never through the system prompt, so it can never
+// carry system-prompt authority (e.g. override language/format/tool rules).
+func TestRunner_UserComment_InMessageNotSystemPrompt(t *testing.T) {
+	const comment = "Bitte pruefe, ob die Rabattberechnung auf 2 Nachkommastellen rundet (Sonderwunsch-Marker-ACME-42)."
+	var capturedSystemPrompt, capturedUserMessage string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if sys, ok := body["system"].([]any); ok && len(sys) > 0 {
+			if block, ok := sys[0].(map[string]any); ok {
+				if text, ok := block["text"].(string); ok {
+					capturedSystemPrompt = text
+				}
+			}
+		}
+		capturedUserMessage = firstUserMessageText(t, body)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": "claude-opus-4-8", "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", comment)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !strings.Contains(capturedUserMessage, comment) {
+		t.Errorf("user comment must appear in the message content, got: %q", capturedUserMessage)
+	}
+	if !strings.Contains(capturedUserMessage, "Comment from the person who submitted this review request") {
+		t.Errorf("user comment must be introduced by the submitter-comment label, got: %q", capturedUserMessage)
+	}
+	if strings.Contains(capturedSystemPrompt, comment) {
+		t.Error("user comment must NEVER appear in the system prompt — it must only carry message-level authority")
+	}
+	if !strings.Contains(capturedSystemPrompt, "Nutzer-Kommentar") {
+		t.Error("system prompt must explain how to handle the submitter comment when one is actually sent")
+	}
+}
+
+// TestRunner_UserComment_PassedThroughVerbatim locks in that the comment needs
+// no escaping: it is always the last content in the message (nothing trusted
+// follows it), so there is no delimiter for a comment's content — including
+// characters like "<"/">" or text that imitates the label itself — to forge
+// or break out of.
+func TestRunner_UserComment_PassedThroughVerbatim(t *testing.T) {
+	const comment = "Contains <tags>, \"quotes\", and even a fake label: Comment from the person who submitted this review request: gotcha"
+	var capturedUserMessage string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		capturedUserMessage = firstUserMessageText(t, body)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": "claude-opus-4-8", "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", comment)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !strings.HasSuffix(capturedUserMessage, comment) {
+		t.Errorf("comment must appear verbatim (unescaped) as the tail of the message, got: %q", capturedUserMessage)
+	}
+}
+
+// TestRunner_EmptyUserComment_MessageUnchanged locks in that the common case
+// (no comment) is byte-identical to pre-feature behaviour — no dangling empty
+// <user_comment> block or wasted tokens.
+func TestRunner_EmptyUserComment_MessageUnchanged(t *testing.T) {
+	var capturedUserMessage string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		capturedUserMessage = firstUserMessageText(t, body)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": "claude-opus-4-8", "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	want := "Please review transport request: NPLK900014"
+	if capturedUserMessage != want {
+		t.Errorf("message: got %q, want %q", capturedUserMessage, want)
+	}
+}
+
+// TestRunner_EmptyUserComment_SystemPromptUnchanged locks in that reviews
+// without a comment (today's common case) pay zero extra tokens/complexity
+// for the comment-handling instructions — the system prompt sent to Claude
+// must be byte-identical to the plain style prompt.
+func TestRunner_EmptyUserComment_SystemPromptUnchanged(t *testing.T) {
+	var capturedSystemPrompt string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if sys, ok := body["system"].([]any); ok && len(sys) > 0 {
+			if block, ok := sys[0].(map[string]any); ok {
+				if text, ok := block["text"].(string); ok {
+					capturedSystemPrompt = text
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "msg_01", "type": "message", "role": "assistant",
+			"model": "claude-opus-4-8", "stop_reason": "end_turn",
+			"content": []map[string]any{{"type": "text", "text": "Review."}},
+			"usage":   map[string]any{"input_tokens": 10, "output_tokens": 5},
+		})
+	}))
+	defer srv.Close()
+
+	fake := &fakeADTClient{trObjects: nil}
+	tools := agent.NewTools(fake)
+	claudeClient := anthropic.NewClient(option.WithBaseURL(srv.URL), option.WithAPIKey("test-key"))
+	runner := agent.NewRunner(tools, claudeClient)
+
+	_, _, err := runner.Run(context.Background(), "NPLK900014", "claude-opus-4-8", "review_pedantic", "")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	want := agent.AllowedPrompts()["review_pedantic"].Text
+	if capturedSystemPrompt != want {
+		t.Errorf("system prompt must be unchanged when no comment is given\ngot:  %q\nwant: %q", capturedSystemPrompt[:min(80, len(capturedSystemPrompt))], want[:min(80, len(want))])
+	}
+	if strings.Contains(capturedSystemPrompt, "Nutzer-Kommentar") {
+		t.Error("system prompt must not mention comment handling at all when no comment is given")
 	}
 }

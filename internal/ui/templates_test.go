@@ -95,6 +95,7 @@ func TestRenderReview_ContainsHeaderMeta(t *testing.T) {
 		TRAuthor:    "JDOE",
 		ModelLabel:  "Opus 4.8 (beste Qualität, >1€/Review)",
 		PromptLabel: "Pedantische Code-Review",
+		UserComment: "Bitte auf 2 Nachkommastellen runden.",
 		Status:      reviewstore.JobStatusDone,
 		ReviewHTML:  "<p>LGTM</p>",
 		CreatedAt:   time.Now(),
@@ -110,6 +111,8 @@ func TestRenderReview_ContainsHeaderMeta(t *testing.T) {
 		"Pedantische Code-Review",
 		// html/template escapes ">" to "&gt;" in the output.
 		"Opus 4.8 (beste Qualität, &gt;1€/Review)",
+		"Kommentar an den Agenten:",
+		"Bitte auf 2 Nachkommastellen runden.",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("review header missing %q\n--- output ---\n%s", want, out)
@@ -137,9 +140,37 @@ func TestRenderReview_OmitsEmptyMeta(t *testing.T) {
 	if strings.Contains(out, "Ersteller:") {
 		t.Error("empty TRAuthor must not render an Ersteller label")
 	}
+	if strings.Contains(out, "Kommentar an den Agenten:") {
+		t.Error("empty UserComment must not render a Kommentar label")
+	}
 	// Title must end right after the TRID when no TR title is present.
 	if !strings.Contains(out, "Code-Review: NPLK900014</h1>") {
 		t.Errorf("title should be bare TRID when TRTitle empty\n%s", out)
+	}
+}
+
+// A comment is free text a developer typed — the most XSS-attractive field in
+// the header. It must go through html/template's normal escaping (no safeHTML),
+// exactly like TRTitle/TRAuthor already do.
+func TestRenderReview_EscapesUserComment(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	job := &reviewstore.Job{
+		ID:          "abc-123",
+		TRID:        "NPLK900014",
+		UserComment: `<script>alert("xss")</script>`,
+		Status:      reviewstore.JobStatusDone,
+		ReviewHTML:  "<p>LGTM</p>",
+		CreatedAt:   time.Now(),
+	}
+	out, err := tmpl.RenderReview(job)
+	if err != nil {
+		t.Fatalf("RenderReview: %v", err)
+	}
+	if strings.Contains(out, "<script>alert") {
+		t.Errorf("UserComment must be HTML-escaped, found raw script tag:\n%s", out)
+	}
+	if !strings.Contains(out, "&lt;script&gt;") {
+		t.Errorf("expected escaped script tag in output, got:\n%s", out)
 	}
 }
 

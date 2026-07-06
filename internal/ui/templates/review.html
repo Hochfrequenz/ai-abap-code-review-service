@@ -68,6 +68,13 @@
       color: #666;
     }
     .review-meta__facts strong { color: var(--soft-black); }
+    .review-meta__comment {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #666;
+      white-space: pre-wrap;
+    }
+    .review-meta__comment strong { color: var(--soft-black); }
     article.review h2 {
       font-family: 'Yanone Kaffeesatz', sans-serif;
       font-size: 1.5rem;
@@ -155,6 +162,9 @@
           {{- with .ModelLabel}}{{- $sep -}}<strong>Modell:</strong> {{.}}{{- $sep = " · " -}}{{end}}
           {{- with .TRAuthor}}{{- $sep -}}<strong>Ersteller:</strong> {{.}}{{end}}
         </p>
+        {{- with .UserComment}}
+        <p class="review-meta__comment"><strong>Kommentar an den Agenten:</strong> {{.}}</p>
+        {{- end}}
       </header>
       {{.ReviewHTML | safeHTML}}
     </article>

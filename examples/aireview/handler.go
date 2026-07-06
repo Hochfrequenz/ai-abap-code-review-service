@@ -23,12 +23,13 @@ import (
 // with a different AI provider (e.g. OpenAI, Gemini) without touching the
 // handler or any other layer.
 // model must be a non-empty key from agent.AllowedModels(); promptKey must be a non-empty
-// key from agent.AllowedPrompts(). Empty string is rejected with 400.
+// key from agent.AllowedPrompts(). Empty string is rejected with 400. userComment is
+// optional free text; pass "" when absent.
 type ReviewRunner interface {
 	// Preflight checks the transport request before any AI tokens are spent.
 	// Returns a German user-facing error if the TR is unreachable or has no reviewable objects.
 	Preflight(ctx context.Context, trID string) error
-	Run(ctx context.Context, trID, model, promptKey string) (string, reviewstore.TokenUsage, error)
+	Run(ctx context.Context, trID, model, promptKey, userComment string) (string, reviewstore.TokenUsage, error)
 }
 
 // TransportRequestLister retrieves open CTS transport requests from SAP ADT.
@@ -55,6 +56,12 @@ type reviewRequest struct {
 	// header. No binding constraints: untrusted, cosmetic.
 	TRTitle  string `json:"tr_title" form:"tr_title"`
 	TRAuthor string `json:"tr_author" form:"tr_author"`
+	// UserComment is optional free text the submitter typed — e.g. acceptance
+	// criteria the review should check the code against. It is rendered
+	// (escaped) in the review header and also passed to the LLM as review
+	// context, never as system-prompt instructions — see agent.Runner.Run.
+	// Capped so an accidental large paste can't balloon token cost.
+	UserComment string `json:"user_comment" form:"user_comment" binding:"max=2000"`
 }
 
 const contentTypeHTML = "text/html; charset=utf-8"
@@ -94,6 +101,11 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 			return
 		}
 
+		// Leading/trailing whitespace is not meaningful content — trimming here
+		// means a whitespace-only comment is treated as absent everywhere
+		// downstream (no empty <user_comment> block, no empty header line).
+		userComment := strings.TrimSpace(req.UserComment)
+
 		// Model/Prompt keys are validated above, so the lookups always hit.
 		// AllowedModels labels carry HTML entities for the <option> context
 		// (e.g. "&gt;1€"); decode to plain text here so html/template re-escapes
@@ -104,6 +116,7 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 			TRAuthor:    req.TRAuthor,
 			ModelLabel:  html.UnescapeString(agent.AllowedModels()[req.Model]),
 			PromptLabel: agent.AllowedPrompts()[req.Prompt].Label,
+			UserComment: userComment,
 		})
 		if err != nil {
 			btp.AbortError(c, http.StatusInternalServerError, btp.CodeInternal, "failed to create review job", err)
@@ -111,19 +124,19 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 		}
 
 		// Use context.WithoutCancel so the goroutine outlives the HTTP response.
-		go func(ctx context.Context, jobID, trID, model, promptKey string) {
+		go func(ctx context.Context, jobID, trID, model, promptKey, userComment string) {
 			_ = store.MarkRunning(ctx, jobID)
 			if err := runner.Preflight(ctx, trID); err != nil {
 				_ = store.MarkFailed(ctx, jobID, err.Error())
 				return
 			}
-			md, usage, runErr := runner.Run(ctx, trID, model, promptKey)
+			md, usage, runErr := runner.Run(ctx, trID, model, promptKey, userComment)
 			if runErr != nil {
 				_ = store.MarkFailed(ctx, jobID, runErr.Error())
 				return
 			}
 			_ = store.MarkDone(ctx, jobID, md, usage)
-		}(context.WithoutCancel(rootCtx), job.ID, job.TRID, req.Model, req.Prompt)
+		}(context.WithoutCancel(rootCtx), job.ID, job.TRID, req.Model, req.Prompt, userComment)
 
 		fragment := fmt.Sprintf(
 			`<p>Review gestartet — <a href="/reviews/%s">Ergebnisse anzeigen</a></p>`+
