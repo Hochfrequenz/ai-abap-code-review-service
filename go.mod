@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/Hochfrequenz/adtler v0.3.14
 	github.com/Hochfrequenz/sap-mcp-config v1.1.0
-	github.com/MicahParks/keyfunc/v3 v3.8.1
+	github.com/MicahParks/keyfunc/v3 v3.8.2
 	github.com/anthropics/anthropic-sdk-go v1.70.1
 	github.com/corbym/gocrest v1.2.1
 	github.com/gin-gonic/gin v1.12.0
@@ -17,7 +17,7 @@ require (
 )
 
 require (
-	github.com/MicahParks/jwkset v0.11.1 // indirect
+	github.com/MicahParks/jwkset v0.11.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
