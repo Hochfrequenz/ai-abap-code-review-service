@@ -1,6 +1,6 @@
 module github.com/hochfrequenz/ai-abap-code-review-service
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/Hochfrequenz/adtler v0.3.14
@@ -13,7 +13,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/yuin/goldmark v1.8.6
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 )
 
 require (
