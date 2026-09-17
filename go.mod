@@ -7,7 +7,7 @@ require (
 	github.com/Hochfrequenz/sap-mcp-config v1.1.0
 	github.com/MicahParks/keyfunc/v3 v3.8.2
 	github.com/anthropics/anthropic-sdk-go v1.72.0
-	github.com/corbym/gocrest v1.2.2
+	github.com/corbym/gocrest v1.3.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
