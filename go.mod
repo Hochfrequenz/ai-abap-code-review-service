@@ -6,7 +6,7 @@ require (
 	github.com/Hochfrequenz/adtler v0.5.0
 	github.com/Hochfrequenz/sap-mcp-config v1.1.0
 	github.com/MicahParks/keyfunc/v3 v3.8.2
-	github.com/anthropics/anthropic-sdk-go v1.73.0
+	github.com/anthropics/anthropic-sdk-go v1.74.0
 	github.com/corbym/gocrest v1.3.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
