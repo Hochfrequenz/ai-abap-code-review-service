@@ -396,14 +396,21 @@ func Test_Service_CallOnPremise_RejectsUnparseableDestinationURL(t *testing.T) {
 // host-pinning guard itself. A destination URL with no host ("http://")
 // trims to "http:", so a suffix of "//evil.example/x" — no "..", no "%",
 // nothing CallOnPremise's own checks reject — would otherwise build the
-// target http://evil.example/x and dial that host.
+// target http://evil.example/x and dial that host (via the proxy, which
+// the test's s.calls counter observes).
 func Test_Service_CallOnPremise_RejectsHostMismatch(t *testing.T) {
 	s := newBTPStack(t, `{"destinationConfiguration":{"URL":"http://"}}`)
 	svc, err := btp.NewService(s.env)
 	then.AssertThat(t, err, is.Nil())
 
-	_, err = svc.CallOnPremise(context.Background(), "D", http.MethodGet, "//evil.example/x", nil, nil)
-	then.AssertThat(t, err, is.Not(is.Nil()))
+	resp, err := svc.CallOnPremise(context.Background(), "D", http.MethodGet, "//evil.example/x", nil, nil)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	then.AssertThat(t, int(s.calls.Load()), is.EqualTo(0))
+	if err == nil {
+		t.Fatal("expected host-mismatch error, got nil")
+	}
 	then.AssertThat(t, strings.Contains(err.Error(), "does not match destination host"), is.True())
 }
 
