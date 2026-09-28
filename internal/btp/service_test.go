@@ -34,7 +34,15 @@ type btpStack struct {
 	tokens  atomic.Int32 // exchange count on the XSUAA server
 	lookups atomic.Int32 // destination lookups
 	calls   atomic.Int32 // on-prem calls
+
+	// strayCalls counts proxy requests (CONNECT included) for any
+	// origin other than redirectDest. Only meaningful on newRedirectStack.
+	strayCalls atomic.Int32
 }
+
+// redirectDest is the destination origin of newRedirectStack. The fake
+// proxy forwards by path only, so the host need not resolve.
+const redirectDest = "http://sap.example:8000"
 
 func newBTPStack(t *testing.T, destBody string) *btpStack {
 	t.Helper()
@@ -43,6 +51,24 @@ func newBTPStack(t *testing.T, destBody string) *btpStack {
 	// On-prem "SAP". The test proxy below forwards to here.
 	s.onPrem = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.calls.Add(1)
+		// Two fixed paths answer with a redirect, for the redirect tests.
+		switch r.URL.Path {
+		case "/redirect-off-host":
+			http.Redirect(w, r, "http://elsewhere.example/landed", http.StatusFound)
+			return
+		case "/redirect-other-scheme":
+			http.Redirect(w, r, "https://sap.example:8000/landed", http.StatusFound)
+			return
+		case "/redirect-other-port":
+			http.Redirect(w, r, "http://sap.example:9000/landed", http.StatusFound)
+			return
+		case "/redirect-same-host":
+			http.Redirect(w, r, "/landed", http.StatusFound)
+			return
+		case "/redirect-loop":
+			http.Redirect(w, r, "/redirect-loop", http.StatusFound)
+			return
+		}
 		// Echo back headers that the test wants to inspect.
 		w.Header().Set("X-Received-Auth", r.Header.Get("Authorization"))
 		w.Header().Set("X-Received-UA", r.Header.Get("User-Agent"))
@@ -62,6 +88,9 @@ func newBTPStack(t *testing.T, destBody string) *btpStack {
 		}
 		// The client sends an absolute URL for HTTP-through-HTTP-proxy.
 		u, err := url.Parse(r.RequestURI)
+		if r.Method == http.MethodConnect || err != nil || u.Scheme+"://"+u.Host != redirectDest {
+			s.strayCalls.Add(1)
+		}
 		if err != nil || u.Host == "" {
 			http.Error(w, "bad request-uri", http.StatusBadRequest)
 			return
@@ -76,7 +105,12 @@ func newBTPStack(t *testing.T, destBody string) *btpStack {
 				outReq.Header.Add(k, v)
 			}
 		}
-		resp, err := http.DefaultClient.Do(outReq)
+		// Relay a redirect to the client instead of following it here:
+		// the redirect tests are about the Service's client.
+		relay := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}}
+		resp, err := relay.Do(outReq)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -412,6 +446,65 @@ func Test_Service_CallOnPremise_RejectsHostMismatch(t *testing.T) {
 		t.Fatal("expected host-mismatch error, got nil")
 	}
 	then.AssertThat(t, strings.Contains(err.Error(), "does not match destination host"), is.True())
+}
+
+// newRedirectStack is a btpStack whose destination is redirectDest.
+func newRedirectStack(t *testing.T) *btpStack {
+	t.Helper()
+	return newBTPStack(t, fmt.Sprintf(`{"destinationConfiguration":{"Name":"D","URL":%q,"ProxyType":"OnPremise","Authentication":"NoAuthentication"}}`, redirectDest))
+}
+
+// Test_Service_CallOnPremise_RejectsCrossOriginRedirect: a redirect to
+// another scheme, host or port is not followed. The request pin in
+// callOnce only sees the first request; without a CheckRedirect policy
+// net/http follows the Location through the same Connectivity transport.
+func Test_Service_CallOnPremise_RejectsCrossOriginRedirect(t *testing.T) {
+	for _, path := range []string{"/redirect-off-host", "/redirect-other-scheme", "/redirect-other-port"} {
+		t.Run(path, func(t *testing.T) {
+			s := newRedirectStack(t)
+			svc, err := btp.NewService(s.env)
+			then.AssertThat(t, err, is.Nil())
+
+			resp, err := svc.CallOnPremise(context.Background(), "D", http.MethodGet, path, nil, nil)
+			then.AssertThat(t, resp == nil, is.True())
+			then.AssertThat(t, int(s.strayCalls.Load()), is.EqualTo(0))
+			then.AssertThat(t, errors.Is(err, btp.ErrOnPremCrossOriginRedirect), is.True())
+			kind, _ := btp.ClassifyOnPremError(err)
+			then.AssertThat(t, kind, is.EqualTo(btp.OnPremFailureTransport))
+		})
+	}
+}
+
+// Test_Service_CallOnPremise_FollowsSameOriginRedirect: a redirect that
+// stays on the destination's origin is still followed.
+func Test_Service_CallOnPremise_FollowsSameOriginRedirect(t *testing.T) {
+	s := newRedirectStack(t)
+	svc, err := btp.NewService(s.env)
+	then.AssertThat(t, err, is.Nil())
+
+	resp, err := svc.CallOnPremise(context.Background(), "D", http.MethodGet, "/redirect-same-host", nil, nil)
+	then.AssertThat(t, err, is.Nil())
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	then.AssertThat(t, err, is.Nil())
+	then.AssertThat(t, resp.StatusCode, is.EqualTo(http.StatusOK))
+	then.AssertThat(t, string(body), is.EqualTo(`{"ok":true,"path":"/landed"}`))
+}
+
+// Test_Service_CallOnPremise_StopsRedirectLoop: a custom CheckRedirect
+// replaces net/http's 10-hop limit, so the policy must re-implement it.
+// Without it a same-origin loop runs until the on-prem timeout.
+func Test_Service_CallOnPremise_StopsRedirectLoop(t *testing.T) {
+	s := newRedirectStack(t)
+	svc, err := btp.NewService(s.env, btp.WithOnPremiseTimeout(5*time.Second))
+	then.AssertThat(t, err, is.Nil())
+
+	resp, err := svc.CallOnPremise(context.Background(), "D", http.MethodGet, "/redirect-loop", nil, nil)
+	then.AssertThat(t, resp == nil, is.True())
+	then.AssertThat(t, err, is.Not(is.Nil()))
+	then.AssertThat(t, errors.Is(err, btp.ErrOnPremCrossOriginRedirect), is.False())
+	then.AssertThat(t, errors.Is(err, context.DeadlineExceeded), is.False())
+	then.AssertThat(t, int(s.calls.Load()), is.EqualTo(10))
 }
 
 // Test_NewService_ZeroOptionsFallBackToDefaults pins the explicit
