@@ -11,9 +11,10 @@ import (
 
 	"github.com/Hochfrequenz/adtler/adt"
 	"github.com/gin-gonic/gin"
+	"github.com/hochfrequenz/btpingo"
+	"github.com/hochfrequenz/btpingo/ginpingo"
 
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/agent"
-	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/reviewstore"
 	"github.com/hochfrequenz/ai-abap-code-review-service/internal/ui"
 )
@@ -82,21 +83,21 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 		// ShouldBind auto-detects content type: handles both form-encoded (HTMX default)
 		// and JSON (direct API calls).
 		if err := c.ShouldBind(&req); err != nil {
-			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest, "transport_request_id is required", nil)
+			ginpingo.AbortError(c, http.StatusBadRequest, btpingo.CodeInvalidRequest, "transport_request_id is required", nil)
 			return
 		}
 
 		// Prompt is required — must be a key from agent.AllowedPrompts().
 		// No silent defaulting: the form always submits a value via the <select>.
 		if _, ok := agent.AllowedPrompts()[req.Prompt]; !ok {
-			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
+			ginpingo.AbortError(c, http.StatusBadRequest, btpingo.CodeInvalidRequest,
 				fmt.Sprintf("Rezensions-Stil unbekannt %q — erlaubt: %s", req.Prompt, allowedPromptKeys()), nil)
 			return
 		}
 		// Model is required — must be a key from agent.AllowedModels().
 		// No silent defaulting: the form always submits a value via the <select>.
 		if _, ok := agent.AllowedModels()[req.Model]; !ok {
-			btp.AbortError(c, http.StatusBadRequest, btp.CodeInvalidRequest,
+			ginpingo.AbortError(c, http.StatusBadRequest, btpingo.CodeInvalidRequest,
 				fmt.Sprintf("Modell fehlt oder unbekannt %q — erlaubt: %s", req.Model, allowedModelKeys()), nil)
 			return
 		}
@@ -119,7 +120,7 @@ func postReview(rootCtx context.Context, store reviewstore.JobStore, runner Revi
 			UserComment: userComment,
 		})
 		if err != nil {
-			btp.AbortError(c, http.StatusInternalServerError, btp.CodeInternal, "failed to create review job", err)
+			ginpingo.AbortError(c, http.StatusInternalServerError, btpingo.CodeInternal, "failed to create review job", err)
 			return
 		}
 
@@ -156,13 +157,13 @@ func getStatus(store reviewstore.JobStore, tmpl ui.Templates) gin.HandlerFunc {
 			// store never fails for any other reason. A persistent store implementation
 			// should map "not found" to a sentinel error and propagate other errors as
 			// CodeInternal.
-			btp.AbortError(c, http.StatusNotFound, btp.CodeNotFound, "review not found", err)
+			ginpingo.AbortError(c, http.StatusNotFound, btpingo.CodeNotFound, "review not found", err)
 			return
 		}
 
 		html, err := tmpl.RenderStatus(job)
 		if err != nil {
-			btp.AbortError(c, http.StatusInternalServerError, btp.CodeInternal, "render failed", err)
+			ginpingo.AbortError(c, http.StatusInternalServerError, btpingo.CodeInternal, "render failed", err)
 			return
 		}
 		c.Data(http.StatusOK, contentTypeHTML, []byte(html))

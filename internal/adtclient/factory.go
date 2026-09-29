@@ -8,8 +8,7 @@ import (
 
 	"github.com/Hochfrequenz/adtler/adt"
 	sapmcpconfig "github.com/Hochfrequenz/sap-mcp-config"
-
-	"github.com/hochfrequenz/ai-abap-code-review-service/internal/btp"
+	"github.com/hochfrequenz/btpingo"
 )
 
 // destinationName is the BTP Destination configured for the on-premise SAP system.
@@ -24,12 +23,12 @@ const (
 
 // NewFromBTPEnv builds an adtler Client that routes through the BTP
 // Connectivity service's SOCKS5 proxy to the on-premise SAP system.
-// This is the single place in the service that bridges internal/btp and adtler.
-func NewFromBTPEnv(ctx context.Context, env btp.Env) (adt.Client, error) {
+// This is the single place in the service that bridges btpingo and adtler.
+func NewFromBTPEnv(ctx context.Context, env btpingo.Env) (adt.Client, error) {
 	// NewTokenFetcher takes an optional *http.Client (nil = 10s default).
 	// Fetch takes (ctx, tokenBaseURL, clientID, clientSecret); env.Dest.URL
 	// is the XSUAA token base URL from the destination service binding.
-	fetcher := btp.NewTokenFetcher(nil)
+	fetcher := btpingo.NewTokenFetcher(nil)
 
 	destToken, err := fetcher.Fetch(ctx, env.Dest.URL, env.Dest.ClientID, env.Dest.ClientSecret)
 	if err != nil {
@@ -38,18 +37,18 @@ func NewFromBTPEnv(ctx context.Context, env btp.Env) (adt.Client, error) {
 
 	// LookupDestination takes (ctx, httpClient, cred, bearer, name).
 	// Passing nil for httpClient uses a 10s default.
-	dest, err := btp.LookupDestination(ctx, nil, env.Dest, destToken, destinationName)
+	dest, err := btpingo.LookupDestination(ctx, nil, env.Dest, destToken, destinationName)
 	if err != nil {
 		return nil, fmt.Errorf("lookup destination %q: %w", destinationName, err)
 	}
 
 	// ConnTokenProvider takes *http.Request so cancellation propagates
 	// into the token fetch.
-	provider := btp.ConnTokenProvider(func(req *http.Request) (string, error) {
+	provider := btpingo.ConnTokenProvider(func(req *http.Request) (string, error) {
 		return fetcher.Fetch(req.Context(), env.Conn.URL, env.Conn.ClientID, env.Conn.ClientSecret)
 	})
 
-	transport, err := btp.NewOnPremiseTransport(env.Conn, provider)
+	transport, err := btpingo.NewOnPremiseTransport(env.Conn, provider)
 	if err != nil {
 		return nil, fmt.Errorf("on-premise transport: %w", err)
 	}

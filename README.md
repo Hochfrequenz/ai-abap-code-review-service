@@ -94,7 +94,7 @@ See [issue #7](https://github.com/Hochfrequenz/ai-abap-code-review-service/issue
 ## Local development
 
 **The server cannot run locally without BTP.**
-`cmd/server/main.go` calls `btp.LoadEnv()` on startup, which reads `VCAP_SERVICES` and `VCAP_APPLICATION` — CF-injected environment variables that are absent on a developer laptop.
+`cmd/server/main.go` calls `btpingo.LoadEnv()` (from [github.com/hochfrequenz/btpingo](https://github.com/hochfrequenz/btpingo)) on startup, which reads `VCAP_SERVICES` and `VCAP_APPLICATION` — CF-injected environment variables that are absent on a developer laptop.
 If they are missing the server refuses to start.
 This is intentional: there is no meaningful stub mode for the three-leg BTP dance (XSUAA → Destination → Cloud Connector).
 
