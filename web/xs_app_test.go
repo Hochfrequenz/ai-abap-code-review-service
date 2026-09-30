@@ -34,12 +34,13 @@ func TestAPIRouteHasCSRFProtectionEnabled(t *testing.T) {
 
 	found := false
 	for _, route := range cfg.Routes {
-		if route.Source != `^/api/(.*)$` {
-			continue
+		if route.Source == `^/api/(.*)$` {
+			found = true
 		}
-		found = true
+		// The approuter uses the first matching route, so an override on any
+		// route (e.g. a catch-all placed before /api) would bypass the check.
 		if route.CSRFProtection != nil && !*route.CSRFProtection {
-			t.Error(`route "^/api/(.*)$" must not set "csrfProtection": false — the approuter's CSRF check must stay enabled on /api/*`)
+			t.Errorf(`route %q must not set "csrfProtection": false - the approuter's CSRF check must stay enabled`, route.Source)
 		}
 	}
 	if !found {

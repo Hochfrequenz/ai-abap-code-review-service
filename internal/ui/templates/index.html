@@ -174,13 +174,11 @@
   </form>
   <div id="result"></div>
   <script>
-    // CSRF bootstrap: the approuter's CSRF check is enabled on /api/*, so
-    // every state-changing htmx request (the "Review anfordern" POST to
-    // /api/reviews) needs a token. /api/me is a cheap, already-JWT-gated
-    // GET; sending "X-CSRF-Token: Fetch" on it makes the approuter return
-    // a fresh token in the x-csrf-token response header without any extra
-    // route. See docs/superpowers/specs/2026-06-02-ai-abap-review-service-design.md
-    // §6 for the full CSRF note.
+    // CSRF: the approuter checks an X-CSRF-Token header on every non-GET
+    // request under /api/*. The token lives in the approuter session; a GET
+    // with "X-CSRF-Token: Fetch" returns it in the x-csrf-token response
+    // header. /api/me is a cheap, JWT-gated GET, so no extra route is
+    // needed. See docs/superpowers/specs/2026-06-02-ai-abap-review-service-design.md §6.
     let csrfToken = null;
     function fetchCsrfToken() {
       return fetch('/api/me', { headers: { 'X-CSRF-Token': 'Fetch' }, credentials: 'same-origin' })
@@ -193,24 +191,28 @@
       if (csrfToken) evt.detail.headers['X-CSRF-Token'] = csrfToken;
     });
 
-    // The approuter's session (and with it the CSRF token) can expire
-    // while the page is open. A stale token is answered with 403 and an
-    // "x-csrf-token: Required" response header — fetch a fresh token and
-    // retry the same request once. dataset.csrfRetried guards against
-    // retrying forever if the 403 has another cause (e.g. the XSUAA
-    // session itself expired).
+    // A 403 with "x-csrf-token: Required" means the request carried no token
+    // (submitted before the fetch above finished) or one that no longer
+    // matches the approuter session. Fetch a fresh token and re-issue the
+    // request once; dataset.csrfRetried prevents a second retry. An expired
+    // session is answered with 401 instead, which a new token cannot fix, so
+    // both end states ask the user to reload the page.
     document.body.addEventListener('htmx:responseError', evt => {
       const xhr = evt.detail.xhr;
-      if (xhr.status !== 403 || xhr.getResponseHeader('x-csrf-token') !== 'Required') return;
       const elt = evt.detail.elt;
-      if (elt.dataset.csrfRetried) {
-        delete elt.dataset.csrfRetried;
+      const csrfRejected = xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required';
+      if (csrfRejected && !elt.dataset.csrfRetried) {
+        elt.dataset.csrfRetried = '1';
+        fetchCsrfToken().then(() => {
+          htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, { source: elt });
+        });
         return;
       }
-      elt.dataset.csrfRetried = '1';
-      fetchCsrfToken().then(() => {
-        htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, { source: elt });
-      });
+      delete elt.dataset.csrfRetried;
+      if (csrfRejected || xhr.status === 401) {
+        document.getElementById('result').innerHTML =
+          '<div class="error">Die Sitzung ist abgelaufen. Bitte die Seite neu laden und das Review erneut anfordern.</div>';
+      }
     });
     document.body.addEventListener('htmx:afterRequest', evt => {
       if (evt.detail.successful) delete evt.detail.elt.dataset.csrfRetried;

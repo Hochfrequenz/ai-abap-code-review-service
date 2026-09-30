@@ -90,11 +90,14 @@ func TestRenderIndex_ContainsCSRFBootstrap(t *testing.T) {
 		`csrfToken = r.headers.get('x-csrf-token')`,
 		// Attaches the token to every outgoing htmx request.
 		`document.body.addEventListener('htmx:configRequest', evt => {`,
-		`evt.detail.headers['X-CSRF-Token'] = csrfToken`,
-		// Refreshes and retries once when the session's token expired.
+		`if (csrfToken) evt.detail.headers['X-CSRF-Token'] = csrfToken;`,
+		// Refreshes and retries exactly once on a CSRF 403.
 		`document.body.addEventListener('htmx:responseError', evt => {`,
-		`xhr.getResponseHeader('x-csrf-token') !== 'Required'`,
+		`xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required'`,
+		`if (csrfRejected && !elt.dataset.csrfRetried) {`,
+		`elt.dataset.csrfRetried = '1';`,
 		`htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, { source: elt })`,
+		`if (evt.detail.successful) delete evt.detail.elt.dataset.csrfRetried;`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("index page missing CSRF bootstrap fragment %q", want)
