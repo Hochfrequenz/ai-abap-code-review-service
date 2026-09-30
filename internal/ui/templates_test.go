@@ -72,6 +72,36 @@ func TestRenderIndex_NoError(t *testing.T) {
 	}
 }
 
+// The approuter's CSRF check is enabled on /api/*, so the UI must fetch a
+// CSRF token via the approuter's fetch protocol and attach it to every
+// htmx request, plus refresh + retry once on a session-expiry 403. These
+// checks are simple, stable string assertions against the rendered page
+// rather than executing the script, but each one fails if the
+// corresponding piece of the bootstrap regresses or is deleted.
+func TestRenderIndex_ContainsCSRFBootstrap(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	for _, want := range []string{
+		// Fetches a token from a GET endpoint using the approuter's fetch protocol.
+		`fetch('/api/me', { headers: { 'X-CSRF-Token': 'Fetch' }, credentials: 'same-origin' })`,
+		`csrfToken = r.headers.get('x-csrf-token')`,
+		// Attaches the token to every outgoing htmx request.
+		`document.body.addEventListener('htmx:configRequest', evt => {`,
+		`evt.detail.headers['X-CSRF-Token'] = csrfToken`,
+		// Refreshes and retries once when the session's token expired.
+		`document.body.addEventListener('htmx:responseError', evt => {`,
+		`xhr.getResponseHeader('x-csrf-token') !== 'Required'`,
+		`htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, { source: elt })`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index page missing CSRF bootstrap fragment %q", want)
+		}
+	}
+}
+
 func TestRenderReview_ContainsTRIDAndContent(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	out, err := tmpl.RenderReview(doneJob())

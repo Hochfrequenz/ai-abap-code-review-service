@@ -174,6 +174,48 @@
   </form>
   <div id="result"></div>
   <script>
+    // CSRF bootstrap: the approuter's CSRF check is enabled on /api/*, so
+    // every state-changing htmx request (the "Review anfordern" POST to
+    // /api/reviews) needs a token. /api/me is a cheap, already-JWT-gated
+    // GET; sending "X-CSRF-Token: Fetch" on it makes the approuter return
+    // a fresh token in the x-csrf-token response header without any extra
+    // route. See docs/superpowers/specs/2026-06-02-ai-abap-review-service-design.md
+    // §6 for the full CSRF note.
+    let csrfToken = null;
+    function fetchCsrfToken() {
+      return fetch('/api/me', { headers: { 'X-CSRF-Token': 'Fetch' }, credentials: 'same-origin' })
+        .then(r => { csrfToken = r.headers.get('x-csrf-token'); })
+        .catch(() => {});
+    }
+    fetchCsrfToken();
+
+    document.body.addEventListener('htmx:configRequest', evt => {
+      if (csrfToken) evt.detail.headers['X-CSRF-Token'] = csrfToken;
+    });
+
+    // The approuter's session (and with it the CSRF token) can expire
+    // while the page is open. A stale token is answered with 403 and an
+    // "x-csrf-token: Required" response header — fetch a fresh token and
+    // retry the same request once. dataset.csrfRetried guards against
+    // retrying forever if the 403 has another cause (e.g. the XSUAA
+    // session itself expired).
+    document.body.addEventListener('htmx:responseError', evt => {
+      const xhr = evt.detail.xhr;
+      if (xhr.status !== 403 || xhr.getResponseHeader('x-csrf-token') !== 'Required') return;
+      const elt = evt.detail.elt;
+      if (elt.dataset.csrfRetried) {
+        delete elt.dataset.csrfRetried;
+        return;
+      }
+      elt.dataset.csrfRetried = '1';
+      fetchCsrfToken().then(() => {
+        htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, { source: elt });
+      });
+    });
+    document.body.addEventListener('htmx:afterRequest', evt => {
+      if (evt.detail.successful) delete evt.detail.elt.dataset.csrfRetried;
+    });
+
     // Load TRs in the background; filter client-side as the user types.
     // The checkbox triggers a re-fetch with ?released=true to include released TRs.
     let allTRs = [];
