@@ -136,7 +136,8 @@
   <h1>ABAP Code-Review</h1>
   <form hx-post="/api/reviews"
         hx-target="#result"
-        hx-swap="innerHTML">
+        hx-swap="innerHTML"
+        hx-sync="this:drop">
     <label for="tr">Transportauftragsnummer</label>
     <div style="position:relative">
       <input id="tr" name="transport_request_id"
@@ -200,15 +201,17 @@
     // A submit -> 403 -> token refresh -> retry cycle spans two async gaps
     // (the failed request's own round trip, then fetchCsrfToken() itself)
     // during which the SAME element can be submitted again. htmx's own
-    // per-element request lock (eltData.xhr) does not cover this: it is
-    // released the moment the failed response arrives, before this handler
-    // even runs. Without an explicit guard, a second submit during either
-    // gap starts its own independent cycle on the same element, and the two
-    // interleave -- e.g. the tr_title/tr_author listener below needs to know
-    // whether it's looking at a retry, and a second submit's own failure
-    // could clear that signal out from under the first cycle's still-pending
-    // retry, making it run unmarked with metadata recomputed from whatever
-    // the user has typed since.
+    // per-element request lock (eltData.xhr) does not cover the FIRST gap:
+    // it is released the moment the failed response arrives (htmx clears it
+    // right after htmx:afterRequest, before this handler even runs), well
+    // before fetchCsrfToken() resolves and the retry is issued. Without an
+    // explicit guard, a second submit during that gap starts its own
+    // independent cycle on the same element, and the two interleave -- e.g.
+    // the tr_title/tr_author listener below needs to know whether it's
+    // looking at a retry, and a second submit's own failure could clear that
+    // signal out from under the first cycle's still-pending retry, making it
+    // run unmarked with metadata recomputed from whatever the user has typed
+    // since.
     //
     // pendingCycles tracks, per element, whether a cycle is currently
     // running (true) or has progressed to "the retry itself is in flight"
@@ -218,8 +221,18 @@
     const pendingCycles = new WeakMap(); // elt -> true | 'retry'
 
     // Block a fresh submit of an element while a CSRF retry cycle for it is
-    // still running; let the cycle's own retry (tagged 'retry' just before
-    // it is issued, below) through.
+    // still running (the gap above); let the cycle's own retry (tagged
+    // 'retry' just before it is issued, below) through. The SECOND gap --
+    // the retry's own XHR round trip -- is covered instead by the form's
+    // hx-sync="this:drop" attribute: once the retry is issued, htmx's
+    // per-element lock (eltData.xhr) IS held again for its duration, so any
+    // submit htmx:confirm lets through here (state is 'retry', not true)
+    // is still dropped by htmx's own sync handling before a request is
+    // built, rather than queued and re-sent afterwards (htmx 2.0.4's
+    // default `queue last` on a busy element). The retry call itself is
+    // issued only after the failed request has fully completed -- htmx has
+    // already cleared eltData.xhr for this element by then -- so `drop`
+    // never blocks the retry, only a later, unrelated submit.
     document.body.addEventListener('htmx:confirm', evt => {
       if (evt.detail.path !== '/api/reviews') return;
       if (pendingCycles.get(evt.detail.elt) === true) evt.preventDefault();
@@ -241,9 +254,24 @@
         const originalValues = Object.fromEntries(evt.detail.requestConfig.parameters);
         fetchCsrfToken().then(() => {
           pendingCycles.set(elt, 'retry');
+          // A network error/abort/timeout on the retry rejects this promise
+          // (htmx's xhr.onerror/onabort/ontimeout) without ever emitting
+          // htmx:responseError -- that event only fires from within the
+          // xhr.onload path, which a network failure never reaches. Without
+          // this .catch(), pendingCycles would stay stuck at 'retry' forever:
+          // the htmx:confirm guard above only blocks the true state, so this
+          // wouldn't block further submits, but it would permanently defeat
+          // the tr_title/tr_author "is this a retry" check below for this
+          // element. A network failure isn't a session problem (no token was
+          // rejected), so it gets its own generic hint rather than the
+          // "session expired" message above.
           htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, {
             source: elt,
             values: originalValues
+          }).catch(() => {
+            pendingCycles.delete(elt);
+            document.getElementById('result').innerHTML =
+              '<div class="error">Der erneute Versuch ist fehlgeschlagen. Bitte das Review erneut anfordern.</div>';
           });
         });
         return;

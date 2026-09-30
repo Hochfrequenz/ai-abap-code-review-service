@@ -72,6 +72,23 @@ func TestRenderIndex_NoError(t *testing.T) {
 	}
 }
 
+// htmx 2.0.4's default "queue last" on a busy element would otherwise
+// re-send a submit made while the CSRF retry's own XHR is in flight, once
+// that retry completes -- a second review. hx-sync="this:drop" makes htmx
+// drop such a submit outright instead of queueing it, without blocking the
+// retry itself (see the comment above the htmx:confirm listener in
+// index.html for why the retry is never itself dropped by this).
+func TestRenderIndex_FormDropsSubmitDuringRetry(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	if !strings.Contains(out, `hx-sync="this:drop"`) {
+		t.Error("index page's review form must set hx-sync=\"this:drop\" to drop a submit made while the CSRF retry is in flight")
+	}
+}
+
 // The approuter's CSRF check is enabled on /api/*, so the UI must fetch a
 // CSRF token via the approuter's fetch protocol and attach it to every
 // htmx request, plus refresh + retry once when the token is missing or
@@ -153,6 +170,29 @@ func TestRenderIndex_CSRFRetrySkipsTRMetadataRecompute(t *testing.T) {
 	}
 	if !strings.Contains(out, "if (pendingCycles.get(evt.detail.elt) === 'retry') return;") {
 		t.Error("index page must skip tr_title/tr_author recomputation on a CSRF retry")
+	}
+}
+
+// A network error/abort/timeout on the retry's own XHR rejects the
+// htmx.ajax() promise without ever emitting htmx:responseError (that event
+// only fires from the xhr.onload path), so nothing else clears pendingCycles
+// or informs the user. Without the .catch() below, the element stays marked
+// 'retry' forever, permanently defeating the tr_title/tr_author recompute
+// guard above for that element.
+func TestRenderIndex_CSRFRetryNetworkFailureClearsState(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	for _, want := range []string{
+		`}).catch(() => {`,
+		`pendingCycles.delete(elt);`,
+		`Der erneute Versuch ist fehlgeschlagen. Bitte das Review erneut anfordern.`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index page missing CSRF-retry network-failure cleanup fragment %q", want)
+		}
 	}
 }
 
