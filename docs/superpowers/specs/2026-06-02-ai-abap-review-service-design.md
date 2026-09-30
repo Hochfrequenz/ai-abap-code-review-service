@@ -231,7 +231,7 @@ Reuses the template's existing XSUAA pattern unchanged:
 { "source": "^/$",            "target": "/",   "destination": "backend", "authenticationType": "xsuaa" }
 ```
 
-The approuter applies CSRF protection by default for non-GET routes. HTMX's `POST` to `/api/reviews` carries an `Authorization` header (Bearer token injected by the approuter) — the approuter does not add a CSRF challenge for routes where the request already carries a bearer token, so no `"csrfProtection": "disabled"` override is needed.
+The approuter applies CSRF protection by default for non-GET routes. The `Authorization: Bearer <jwt>` header is added by the approuter itself and never travels from the browser, so it does not stand in for a CSRF check. CSRF protection for browser requests comes from the approuter's CSRF check on `/api/*`; the UI fetches a token via the approuter's fetch protocol and attaches it to state-changing requests (see `internal/ui/templates/index.html`).
 
 ---
 
