@@ -194,15 +194,44 @@
     // A 403 with "x-csrf-token: Required" means the request carried no token
     // (submitted before the fetch above finished) or one that no longer
     // matches the approuter session. Fetch a fresh token and re-issue the
-    // request once; dataset.csrfRetried prevents a second retry. An expired
-    // session is answered with 401 instead, which a new token cannot fix, so
-    // both end states ask the user to reload the page.
+    // request once. An expired session is answered with 401 instead, which a
+    // new token cannot fix, so both end states ask the user to reload.
+    //
+    // A submit -> 403 -> token refresh -> retry cycle spans two async gaps
+    // (the failed request's own round trip, then fetchCsrfToken() itself)
+    // during which the SAME element can be submitted again. htmx's own
+    // per-element request lock (eltData.xhr) does not cover this: it is
+    // released the moment the failed response arrives, before this handler
+    // even runs. Without an explicit guard, a second submit during either
+    // gap starts its own independent cycle on the same element, and the two
+    // interleave -- e.g. the tr_title/tr_author listener below needs to know
+    // whether it's looking at a retry, and a second submit's own failure
+    // could clear that signal out from under the first cycle's still-pending
+    // retry, making it run unmarked with metadata recomputed from whatever
+    // the user has typed since.
+    //
+    // pendingCycles tracks, per element, whether a cycle is currently
+    // running (true) or has progressed to "the retry itself is in flight"
+    // ('retry') -- so exactly one retry is ever in flight per element, the
+    // htmx:confirm listener below can drop any other submit of that element
+    // for the duration, and no other listener needs its own per-element flag.
+    const pendingCycles = new WeakMap(); // elt -> true | 'retry'
+
+    // Block a fresh submit of an element while a CSRF retry cycle for it is
+    // still running; let the cycle's own retry (tagged 'retry' just before
+    // it is issued, below) through.
+    document.body.addEventListener('htmx:confirm', evt => {
+      if (evt.detail.path !== '/api/reviews') return;
+      if (pendingCycles.get(evt.detail.elt) === true) evt.preventDefault();
+    });
+
     document.body.addEventListener('htmx:responseError', evt => {
       const xhr = evt.detail.xhr;
       const elt = evt.detail.elt;
       const csrfRejected = xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required';
-      if (csrfRejected && !elt.dataset.csrfRetried) {
-        elt.dataset.csrfRetried = '1';
+      const isRetryResponse = pendingCycles.get(elt) === 'retry';
+      if (csrfRejected && !isRetryResponse) {
+        pendingCycles.set(elt, true);
         // Snapshot the values htmx actually submitted (form fields plus
         // anything injected by other configRequest listeners, e.g. tr_title/
         // tr_author below) so the retry replays the ORIGINAL request rather
@@ -211,6 +240,7 @@
         // submitted on retry.
         const originalValues = Object.fromEntries(evt.detail.requestConfig.parameters);
         fetchCsrfToken().then(() => {
+          pendingCycles.set(elt, 'retry');
           htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, {
             source: elt,
             values: originalValues
@@ -218,14 +248,14 @@
         });
         return;
       }
-      delete elt.dataset.csrfRetried;
+      pendingCycles.delete(elt);
       if (csrfRejected || xhr.status === 401) {
         document.getElementById('result').innerHTML =
           '<div class="error">Die Sitzung ist abgelaufen. Bitte die Seite neu laden und das Review erneut anfordern.</div>';
       }
     });
     document.body.addEventListener('htmx:afterRequest', evt => {
-      if (evt.detail.successful) delete evt.detail.elt.dataset.csrfRetried;
+      if (evt.detail.successful) pendingCycles.delete(evt.detail.elt);
     });
 
     // Load TRs in the background; filter client-side as the user types.
@@ -279,14 +309,15 @@
     // loaded list (e.g. a released TR with the checkbox off), the fields stay
     // empty and the server renders the header without them.
     //
-    // On a CSRF retry (dataset.csrfRetried set), the responseError handler
-    // above has already put the original tr_title/tr_author into the request
-    // via the `values` override, so this must not recompute them from the
-    // form's current state -- that could replace the originally submitted
-    // values with whatever the user has typed since.
+    // On a CSRF retry (pendingCycles has this element tagged 'retry'), the
+    // responseError handler above has already put the original
+    // tr_title/tr_author into the request via the `values` override, so this
+    // must not recompute them from the form's current state -- that could
+    // replace the originally submitted values with whatever the user has
+    // typed since.
     document.body.addEventListener('htmx:configRequest', function(evt) {
       if (evt.detail.path !== '/api/reviews') return;
-      if (evt.detail.elt && evt.detail.elt.dataset.csrfRetried === '1') return;
+      if (pendingCycles.get(evt.detail.elt) === 'retry') return;
       const q = (input.value || '').trim().toUpperCase();
       const tr = allTRs.find(t => t.number.toUpperCase() === q);
       evt.detail.parameters['tr_title']  = tr ? tr.description : '';

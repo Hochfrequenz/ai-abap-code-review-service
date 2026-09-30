@@ -96,20 +96,46 @@ func TestRenderIndex_ContainsCSRFBootstrap(t *testing.T) {
 		// Refreshes and retries exactly once on a CSRF 403.
 		`document.body.addEventListener('htmx:responseError', evt => {`,
 		`xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required'`,
-		`if (csrfRejected && !elt.dataset.csrfRetried) {`,
-		`elt.dataset.csrfRetried = '1';`,
+		`const isRetryResponse = pendingCycles.get(elt) === 'retry';`,
+		`if (csrfRejected && !isRetryResponse) {`,
+		`pendingCycles.set(elt, true);`,
 		// The retry must replay the ORIGINAL request: snapshot what htmx
 		// actually submitted before the token refresh (edits made to the
 		// form while the fetch is in flight must not leak into the retry),
 		// then pass it back in as `values` so it wins over the form's
 		// current state.
 		`const originalValues = Object.fromEntries(evt.detail.requestConfig.parameters);`,
+		`pendingCycles.set(elt, 'retry');`,
 		`htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, {`,
 		`values: originalValues`,
-		`if (evt.detail.successful) delete evt.detail.elt.dataset.csrfRetried;`,
+		`if (evt.detail.successful) pendingCycles.delete(evt.detail.elt);`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("index page missing CSRF bootstrap fragment %q", want)
+		}
+	}
+}
+
+// A submit -> 403 -> token refresh -> retry cycle spans two async gaps
+// during which the same form element could otherwise be submitted again,
+// starting a second, interleaving cycle (see the comment above the
+// pendingCycles declaration in index.html for the failure mode this
+// guards against). The htmx:confirm listener must drop any such submit
+// while a cycle for that element is running, and must let the cycle's own
+// retry (tagged 'retry' rather than true) through.
+func TestRenderIndex_CSRFCycleBlocksConcurrentSubmit(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	for _, want := range []string{
+		`const pendingCycles = new WeakMap();`,
+		`document.body.addEventListener('htmx:confirm', evt => {`,
+		`if (pendingCycles.get(evt.detail.elt) === true) evt.preventDefault();`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index page missing CSRF concurrent-submit guard fragment %q", want)
 		}
 	}
 }
@@ -125,7 +151,7 @@ func TestRenderIndex_CSRFRetrySkipsTRMetadataRecompute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderIndex: %v", err)
 	}
-	if !strings.Contains(out, "if (evt.detail.elt && evt.detail.elt.dataset.csrfRetried === '1') return;") {
+	if !strings.Contains(out, "if (pendingCycles.get(evt.detail.elt) === 'retry') return;") {
 		t.Error("index page must skip tr_title/tr_author recomputation on a CSRF retry")
 	}
 }
