@@ -74,10 +74,12 @@ func TestRenderIndex_NoError(t *testing.T) {
 
 // The approuter's CSRF check is enabled on /api/*, so the UI must fetch a
 // CSRF token via the approuter's fetch protocol and attach it to every
-// htmx request, plus refresh + retry once on a session-expiry 403. These
-// checks are simple, stable string assertions against the rendered page
-// rather than executing the script, but each one fails if the
-// corresponding piece of the bootstrap regresses or is deleted.
+// htmx request, plus refresh + retry once when the token is missing or
+// stale (403). An expired session is a separate case (401), which a new
+// token cannot fix. These checks are simple, stable string assertions
+// against the rendered page rather than executing the script, but each one
+// fails if the corresponding piece of the bootstrap regresses or is
+// deleted.
 func TestRenderIndex_ContainsCSRFBootstrap(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	out, err := tmpl.RenderIndex()
@@ -96,12 +98,35 @@ func TestRenderIndex_ContainsCSRFBootstrap(t *testing.T) {
 		`xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required'`,
 		`if (csrfRejected && !elt.dataset.csrfRetried) {`,
 		`elt.dataset.csrfRetried = '1';`,
-		`htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, { source: elt })`,
+		// The retry must replay the ORIGINAL request: snapshot what htmx
+		// actually submitted before the token refresh (edits made to the
+		// form while the fetch is in flight must not leak into the retry),
+		// then pass it back in as `values` so it wins over the form's
+		// current state.
+		`const originalValues = Object.fromEntries(evt.detail.requestConfig.parameters);`,
+		`htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, {`,
+		`values: originalValues`,
 		`if (evt.detail.successful) delete evt.detail.elt.dataset.csrfRetried;`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("index page missing CSRF bootstrap fragment %q", want)
 		}
+	}
+}
+
+// The tr_title/tr_author configRequest listener recomputes those fields from
+// the form's current state on every normal submit. On a CSRF retry it must
+// NOT do that: the responseError handler has already replayed the original
+// tr_title/tr_author via the `values` override, and recomputing here would
+// silently replace them with whatever the user typed after the initial 403.
+func TestRenderIndex_CSRFRetrySkipsTRMetadataRecompute(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	if !strings.Contains(out, "if (evt.detail.elt && evt.detail.elt.dataset.csrfRetried === '1') return;") {
+		t.Error("index page must skip tr_title/tr_author recomputation on a CSRF retry")
 	}
 }
 
