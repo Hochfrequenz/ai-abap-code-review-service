@@ -3,14 +3,14 @@ module github.com/hochfrequenz/ai-abap-code-review-service
 go 1.26.0
 
 require (
-	github.com/Hochfrequenz/adtler v0.5.4
+	github.com/Hochfrequenz/adtler v0.6.0
 	github.com/Hochfrequenz/sap-mcp-config v1.1.0
-	github.com/anthropics/anthropic-sdk-go v1.75.0
+	github.com/anthropics/anthropic-sdk-go v1.78.0
 	github.com/corbym/gocrest v1.3.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/uuid v1.6.0
-	github.com/hochfrequenz/btpingo v0.1.1
+	github.com/hochfrequenz/btpingo v0.2.0
 	github.com/yuin/goldmark v1.8.6
 )
 
@@ -33,6 +33,7 @@ require (
 	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
