@@ -72,6 +72,130 @@ func TestRenderIndex_NoError(t *testing.T) {
 	}
 }
 
+// htmx 2.0.4's default "queue last" on a busy element would otherwise
+// re-send a submit made while the CSRF retry's own XHR is in flight, once
+// that retry completes -- a second review. hx-sync="this:drop" makes htmx
+// drop such a submit outright instead of queueing it, without blocking the
+// retry itself (see the comment above the htmx:confirm listener in
+// index.html for why the retry is never itself dropped by this).
+func TestRenderIndex_FormDropsSubmitDuringRetry(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	if !strings.Contains(out, `hx-sync="this:drop"`) {
+		t.Error("index page's review form must set hx-sync=\"this:drop\" to drop a submit made while the CSRF retry is in flight")
+	}
+}
+
+// The approuter's CSRF check is enabled on /api/*, so the UI must fetch a
+// CSRF token via the approuter's fetch protocol and attach it to every
+// htmx request, plus refresh + retry once when the token is missing or
+// stale (403). An expired session is a separate case (401), which a new
+// token cannot fix. These checks are simple, stable string assertions
+// against the rendered page rather than executing the script, but each one
+// fails if the corresponding piece of the bootstrap regresses or is
+// deleted.
+func TestRenderIndex_ContainsCSRFBootstrap(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	for _, want := range []string{
+		// Fetches a token from a GET endpoint using the approuter's fetch protocol.
+		`fetch('/api/me', { headers: { 'X-CSRF-Token': 'Fetch' }, credentials: 'same-origin' })`,
+		`csrfToken = r.headers.get('x-csrf-token')`,
+		// Attaches the token to every outgoing htmx request.
+		`document.body.addEventListener('htmx:configRequest', evt => {`,
+		`if (csrfToken) evt.detail.headers['X-CSRF-Token'] = csrfToken;`,
+		// Refreshes and retries exactly once on a CSRF 403.
+		`document.body.addEventListener('htmx:responseError', evt => {`,
+		`xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required'`,
+		`const isRetryResponse = pendingCycles.get(elt) === 'retry';`,
+		`if (csrfRejected && !isRetryResponse) {`,
+		`pendingCycles.set(elt, true);`,
+		// The retry must replay the ORIGINAL request: snapshot what htmx
+		// actually submitted before the token refresh (edits made to the
+		// form while the fetch is in flight must not leak into the retry),
+		// then pass it back in as `values` so it wins over the form's
+		// current state.
+		`const originalValues = Object.fromEntries(evt.detail.requestConfig.parameters);`,
+		`pendingCycles.set(elt, 'retry');`,
+		`htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, {`,
+		`values: originalValues`,
+		`if (evt.detail.successful) pendingCycles.delete(evt.detail.elt);`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index page missing CSRF bootstrap fragment %q", want)
+		}
+	}
+}
+
+// A submit -> 403 -> token refresh -> retry cycle spans two async gaps
+// during which the same form element could otherwise be submitted again,
+// starting a second, interleaving cycle (see the comment above the
+// pendingCycles declaration in index.html for the failure mode this
+// guards against). The htmx:confirm listener must drop any such submit
+// while a cycle for that element is running, and must let the cycle's own
+// retry (tagged 'retry' rather than true) through.
+func TestRenderIndex_CSRFCycleBlocksConcurrentSubmit(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	for _, want := range []string{
+		`const pendingCycles = new WeakMap();`,
+		`document.body.addEventListener('htmx:confirm', evt => {`,
+		`if (pendingCycles.get(evt.detail.elt) === true) evt.preventDefault();`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index page missing CSRF concurrent-submit guard fragment %q", want)
+		}
+	}
+}
+
+// The tr_title/tr_author configRequest listener recomputes those fields from
+// the form's current state on every normal submit. On a CSRF retry it must
+// NOT do that: the responseError handler has already replayed the original
+// tr_title/tr_author via the `values` override, and recomputing here would
+// silently replace them with whatever the user typed after the initial 403.
+func TestRenderIndex_CSRFRetrySkipsTRMetadataRecompute(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	if !strings.Contains(out, "if (pendingCycles.get(evt.detail.elt) === 'retry') return;") {
+		t.Error("index page must skip tr_title/tr_author recomputation on a CSRF retry")
+	}
+}
+
+// A network error/abort/timeout on the retry's own XHR rejects the
+// htmx.ajax() promise without ever emitting htmx:responseError (that event
+// only fires from the xhr.onload path), so nothing else clears pendingCycles
+// or informs the user. Without the .catch() below, the element stays marked
+// 'retry' forever, permanently defeating the tr_title/tr_author recompute
+// guard above for that element.
+func TestRenderIndex_CSRFRetryNetworkFailureClearsState(t *testing.T) {
+	tmpl := ui.MustLoadTemplates()
+	out, err := tmpl.RenderIndex()
+	if err != nil {
+		t.Fatalf("RenderIndex: %v", err)
+	}
+	for _, want := range []string{
+		`}).catch(() => {`,
+		`pendingCycles.delete(elt);`,
+		`Der erneute Versuch ist fehlgeschlagen. Bitte das Review erneut anfordern.`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index page missing CSRF-retry network-failure cleanup fragment %q", want)
+		}
+	}
+}
+
 func TestRenderReview_ContainsTRIDAndContent(t *testing.T) {
 	tmpl := ui.MustLoadTemplates()
 	out, err := tmpl.RenderReview(doneJob())
