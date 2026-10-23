@@ -4,8 +4,8 @@ cloud.google.com/go/auth/oauth2adapt v0.2.3 h1:MlxF+Pd3OmSudg/b1yZ5lJwoXCEaeedAg
 cloud.google.com/go/auth/oauth2adapt v0.2.3/go.mod h1:tMQXOfZzFuNuUxOypHlQEXgdfX5cuhwU+ffUuXRJE8I=
 cloud.google.com/go/compute/metadata v0.5.0 h1:Zr0eK8JbFv6+Wi4ilXAR8FJ3wyNdpxHKJNPos6LTZOY=
 cloud.google.com/go/compute/metadata v0.5.0/go.mod h1:aHnloV2TPI38yx4s9+wAZhHykWvVCfu7hQbF+9CWoiY=
-github.com/Hochfrequenz/adtler v0.9.1 h1:lIs8gPuUjlcRLCRO2snmKsadobdwBhpKoPmVp+DIMUI=
-github.com/Hochfrequenz/adtler v0.9.1/go.mod h1:MXIK5coKIJfV6L2U2pgluWwMrHQHVMVAgKAgDmpVdSg=
+github.com/Hochfrequenz/adtler v0.10.0 h1:am1FqHypX1QjFCU/X0iBNHS8a+t1+b9RIbYcQkeTXZY=
+github.com/Hochfrequenz/adtler v0.10.0/go.mod h1:MXIK5coKIJfV6L2U2pgluWwMrHQHVMVAgKAgDmpVdSg=
 github.com/Hochfrequenz/sap-mcp-config v1.1.0 h1:hHlSr6VVgOKIQVv7OhcX7rglafle0iHPTcqb3xVF0cM=
 github.com/Hochfrequenz/sap-mcp-config v1.1.0/go.mod h1:H8e62LdyitgF9jdPPXkDVRZYz84QNJpyoEHaYKycVjE=
 github.com/MicahParks/jwkset v0.11.3 h1:Phli4RdTDdIdLXZpuO7abkwZyzIk0RDTUPVVBHPRdkQ=
