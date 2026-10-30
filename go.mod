@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/Hochfrequenz/adtler v0.10.0
-	github.com/Hochfrequenz/sap-mcp-config v1.1.0
+	github.com/Hochfrequenz/sap-mcp-config v1.1.1
 	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/corbym/gocrest v1.3.0
 	github.com/gin-gonic/gin v1.12.0
