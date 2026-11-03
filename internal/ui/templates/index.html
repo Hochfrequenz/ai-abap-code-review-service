@@ -136,7 +136,8 @@
   <h1>ABAP Code-Review</h1>
   <form hx-post="/api/reviews"
         hx-target="#result"
-        hx-swap="innerHTML">
+        hx-swap="innerHTML"
+        hx-sync="this:drop">
     <label for="tr">Transportauftragsnummer</label>
     <div style="position:relative">
       <input id="tr" name="transport_request_id"
@@ -174,6 +175,117 @@
   </form>
   <div id="result"></div>
   <script>
+    // CSRF: the approuter checks an X-CSRF-Token header on every non-GET
+    // request under /api/*. The token lives in the approuter session; a GET
+    // with "X-CSRF-Token: Fetch" returns it in the x-csrf-token response
+    // header. /api/me is a cheap, JWT-gated GET, so no extra route is
+    // needed. See docs/superpowers/specs/2026-06-02-ai-abap-review-service-design.md §6.
+    let csrfToken = null;
+    function fetchCsrfToken() {
+      return fetch('/api/me', { headers: { 'X-CSRF-Token': 'Fetch' }, credentials: 'same-origin' })
+        .then(r => { csrfToken = r.headers.get('x-csrf-token'); })
+        .catch(() => {});
+    }
+    fetchCsrfToken();
+
+    document.body.addEventListener('htmx:configRequest', evt => {
+      if (csrfToken) evt.detail.headers['X-CSRF-Token'] = csrfToken;
+    });
+
+    // A 403 with "x-csrf-token: Required" means the request carried no token
+    // (submitted before the fetch above finished) or one that no longer
+    // matches the approuter session. Fetch a fresh token and re-issue the
+    // request once. An expired session is answered with 401 instead, which a
+    // new token cannot fix, so both end states ask the user to reload.
+    //
+    // A submit -> 403 -> token refresh -> retry cycle spans two async gaps
+    // (the failed request's own round trip, then fetchCsrfToken() itself)
+    // during which the SAME element can be submitted again. htmx's own
+    // per-element request lock (eltData.xhr) does not cover the FIRST gap:
+    // it is released the moment the failed response arrives (htmx clears it
+    // right after htmx:afterRequest, before this handler even runs), well
+    // before fetchCsrfToken() resolves and the retry is issued. Without an
+    // explicit guard, a second submit during that gap starts its own
+    // independent cycle on the same element, and the two interleave -- e.g.
+    // the tr_title/tr_author listener below needs to know whether it's
+    // looking at a retry, and a second submit's own failure could clear that
+    // signal out from under the first cycle's still-pending retry, making it
+    // run unmarked with metadata recomputed from whatever the user has typed
+    // since.
+    //
+    // pendingCycles tracks, per element, whether a cycle is currently
+    // running (true) or has progressed to "the retry itself is in flight"
+    // ('retry') -- so exactly one retry is ever in flight per element, the
+    // htmx:confirm listener below can drop any other submit of that element
+    // for the duration, and no other listener needs its own per-element flag.
+    const pendingCycles = new WeakMap(); // elt -> true | 'retry'
+
+    // Block a fresh submit of an element while a CSRF retry cycle for it is
+    // still running (the gap above); let the cycle's own retry (tagged
+    // 'retry' just before it is issued, below) through. The SECOND gap --
+    // the retry's own XHR round trip -- is covered instead by the form's
+    // hx-sync="this:drop" attribute: once the retry is issued, htmx's
+    // per-element lock (eltData.xhr) IS held again for its duration, so any
+    // submit htmx:confirm lets through here (state is 'retry', not true)
+    // is still dropped by htmx's own sync handling before a request is
+    // built, rather than queued and re-sent afterwards (htmx 2.0.4's
+    // default `queue last` on a busy element). The retry call itself is
+    // issued only after the failed request has fully completed -- htmx has
+    // already cleared eltData.xhr for this element by then -- so `drop`
+    // never blocks the retry, only a later, unrelated submit.
+    document.body.addEventListener('htmx:confirm', evt => {
+      if (evt.detail.path !== '/api/reviews') return;
+      if (pendingCycles.get(evt.detail.elt) === true) evt.preventDefault();
+    });
+
+    document.body.addEventListener('htmx:responseError', evt => {
+      const xhr = evt.detail.xhr;
+      const elt = evt.detail.elt;
+      const csrfRejected = xhr.status === 403 && xhr.getResponseHeader('x-csrf-token') === 'Required';
+      const isRetryResponse = pendingCycles.get(elt) === 'retry';
+      if (csrfRejected && !isRetryResponse) {
+        pendingCycles.set(elt, true);
+        // Snapshot the values htmx actually submitted (form fields plus
+        // anything injected by other configRequest listeners, e.g. tr_title/
+        // tr_author below) so the retry replays the ORIGINAL request rather
+        // than re-serializing the form. Without this, edits made to the form
+        // while the token fetch is in flight would silently change what gets
+        // submitted on retry.
+        const originalValues = Object.fromEntries(evt.detail.requestConfig.parameters);
+        fetchCsrfToken().then(() => {
+          pendingCycles.set(elt, 'retry');
+          // A network error/abort/timeout on the retry rejects this promise
+          // (htmx's xhr.onerror/onabort/ontimeout) without ever emitting
+          // htmx:responseError -- that event only fires from within the
+          // xhr.onload path, which a network failure never reaches. Without
+          // this .catch(), pendingCycles would stay stuck at 'retry' forever:
+          // the htmx:confirm guard above only blocks the true state, so this
+          // wouldn't block further submits, but it would permanently defeat
+          // the tr_title/tr_author "is this a retry" check below for this
+          // element. A network failure isn't a session problem (no token was
+          // rejected), so it gets its own generic hint rather than the
+          // "session expired" message above.
+          htmx.ajax(evt.detail.requestConfig.verb, evt.detail.requestConfig.path, {
+            source: elt,
+            values: originalValues
+          }).catch(() => {
+            pendingCycles.delete(elt);
+            document.getElementById('result').innerHTML =
+              '<div class="error">Der erneute Versuch ist fehlgeschlagen. Bitte das Review erneut anfordern.</div>';
+          });
+        });
+        return;
+      }
+      pendingCycles.delete(elt);
+      if (csrfRejected || xhr.status === 401) {
+        document.getElementById('result').innerHTML =
+          '<div class="error">Die Sitzung ist abgelaufen. Bitte die Seite neu laden und das Review erneut anfordern.</div>';
+      }
+    });
+    document.body.addEventListener('htmx:afterRequest', evt => {
+      if (evt.detail.successful) pendingCycles.delete(evt.detail.elt);
+    });
+
     // Load TRs in the background; filter client-side as the user types.
     // The checkbox triggers a re-fetch with ?released=true to include released TRs.
     let allTRs = [];
@@ -224,8 +336,16 @@
     // a suggestion or typed the number by hand. If the typed number isn't in the
     // loaded list (e.g. a released TR with the checkbox off), the fields stay
     // empty and the server renders the header without them.
+    //
+    // On a CSRF retry (pendingCycles has this element tagged 'retry'), the
+    // responseError handler above has already put the original
+    // tr_title/tr_author into the request via the `values` override, so this
+    // must not recompute them from the form's current state -- that could
+    // replace the originally submitted values with whatever the user has
+    // typed since.
     document.body.addEventListener('htmx:configRequest', function(evt) {
       if (evt.detail.path !== '/api/reviews') return;
+      if (pendingCycles.get(evt.detail.elt) === 'retry') return;
       const q = (input.value || '').trim().toUpperCase();
       const tr = allTRs.find(t => t.number.toUpperCase() === q);
       evt.detail.parameters['tr_title']  = tr ? tr.description : '';
