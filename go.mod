@@ -3,7 +3,7 @@ module github.com/hochfrequenz/ai-abap-code-review-service
 go 1.26.0
 
 require (
-	github.com/Hochfrequenz/adtler v0.10.0
+	github.com/Hochfrequenz/adtler v0.14.0
 	github.com/Hochfrequenz/sap-mcp-config v1.1.1
 	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/corbym/gocrest v1.3.0
@@ -15,6 +15,7 @@ require (
 )
 
 require (
+	github.com/Hochfrequenz/sap-mcp-config/v2 v2.0.0 // indirect
 	github.com/MicahParks/jwkset v0.11.4 // indirect
 	github.com/MicahParks/keyfunc/v3 v3.9.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
@@ -63,7 +64,7 @@ require (
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
